@@ -45,6 +45,9 @@ class Validator(object):
         self.tail_membership = {ROOT.hash: ROOT.hash}
         self.id = id
 
+        # Flag is has been slashed since last Byantine message
+        self.slashed = False
+
     # If we processed an object but did not receive some dependencies
     # needed to process it, save it to be processed later
     def add_dependency(self, hash_, obj):
@@ -84,6 +87,25 @@ class Validator(object):
             if descendant.hash == ancestor.hash:
                 return True
             descendant = self.get_checkpoint_parent(descendant)
+
+
+    def slash(self):
+        
+        if not self.slashed:
+            print("SLASHING")
+            x = self.deposit * 0.2
+            self.deposit -= x
+            self.slashed = True
+            print(f"{self.id}, {self.deposit}")
+            return x
+        return 0
+
+    def reward(self):
+        
+        x = self.deposit * 0.1
+        self.deposit += x
+        return x
+
 
     # Called every round
     def tick(self, time):

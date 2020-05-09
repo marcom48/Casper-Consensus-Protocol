@@ -1,5 +1,6 @@
 import random
 from message import VoteMessage
+from parameters import INITIAL_DEPOSIT, NUM_VALIDATORS
 
 
 class Network(object):
@@ -15,11 +16,28 @@ class Network(object):
         self.msg_arrivals = {}
         self.latency = _latency
 
+        self.total_deposit = INITIAL_DEPOSIT * NUM_VALIDATORS
+
     def add_nodes(self, _nodes):
         self.nodes = _nodes
 
     def generate_latency(self):
         return 1 + int(random.expovariate(1) * self.latency)
+
+    def slash_node(self, node):
+        for n in self.nodes:
+            if n.id == node:
+                if not n.slashed:
+                    self.total_deposit -= n.slash()
+                break
+
+    
+    def reward_node(self, node):
+        for n in self.nodes:
+            if n.id == node:
+
+                self.total_deposit += n.reward()
+                break
 
     def broadcast(self, msg):
         """

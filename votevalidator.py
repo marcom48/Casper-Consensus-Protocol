@@ -177,9 +177,10 @@ class VoteValidator(Validator):
                 # (self.id, target_block.hash, target_block.checkpoint_height,
                 # source_block.checkpoint_height))
 
-                if random.randint(1, 10) > 11 and len(self.proposed_votes) > 0:
+                if random.randint(1, 40) > 35 and len(self.proposed_votes) > 0:
 
                     print(f"Sent BYZANTINE {self.proposed_votes[0]} ")
+                    self.slashed = False
                     self.proposed_votes.append(self.proposed_votes[0])
                     self.network.broadcast(self.proposed_votes[0])
                     assert self.processed[target_block.hash]
@@ -229,8 +230,8 @@ class VoteValidator(Validator):
         # TODO: reorganize dynasties like the paper
 
         # TODO: Add in function to check if in dynasties
-        if vote.validator not in self.processed[vote.target].current_dynasty.validators and \
-                vote.validator not in self.processed[vote.target].prev_dynasty.validators:
+        if vote.validator not in self.processed[vote.target].forward_validators.validators and \
+                vote.validator not in self.processed[vote.target].rear_validators.validators:
             print("Not in validator")
             return False
 
@@ -244,7 +245,7 @@ class VoteValidator(Validator):
         # print("-"*20)
         for past_vote in self.votes[vote.validator]:
             if past_vote.target_height == vote.target_height:
-                # TODO: SLASH
+                self.network.slash_node(vote.validator)
                 print('You just got slashed.')
                 return False
 
@@ -252,10 +253,11 @@ class VoteValidator(Validator):
                  past_vote.target_height > vote.target_height) or
                 (past_vote.source_height > vote.source_height and
                  past_vote.target_height < vote.target_height)):
+                self.network.slash_node(vote.validator)
                 print('You just got slashed.')
                 return False
 
-        print("-"*20)
+        # print("-"*20)
 
         # Add the vote to the map of votes
         # Successfully passed checks
@@ -273,7 +275,7 @@ class VoteValidator(Validator):
         # TODO: we do not deal with finalised dynasties (the pool of validator
         # is always the same right now)
         # If there are enough votes, process them
-        if (self.vote_count[vote.source][vote.target] > (INITIAL_DEPOSIT * NUM_VALIDATORS * 2) // 3):
+        if (self.vote_count[vote.source][vote.target] > (self.network.total_deposit * 2) // 3):
             # Mark the target as justified
             self.justified.add(vote.target)
             if vote.target_height > self.highest_justified_checkpoint.checkpoint_height:
@@ -283,20 +285,19 @@ class VoteValidator(Validator):
             # is finalised
             if vote.source_height == vote.target_height - 1:
                 self.finalised.add(vote.source)
+                self.network.reward_node(self.id)
         return True
 
     # Called on processing any object
     def on_receive(self, obj):
         if obj.hash in self.processed:
             # return False
-            # if isinstance(obj, VoteMessage):
-            #     print("ALREADY RECV")
-            return
+            if not isinstance(obj, VoteMessage):
+                return
 
         if isinstance(obj, Block):
             result = self.accept_block(obj)
         elif isinstance(obj, VoteMessage):
-            print(f"Received {obj} at {self.id}")
             result = self.accept_vote(obj)
         # If the object was successfully processed
         # (ie. not flagged as having unsatisfied dependencies)
