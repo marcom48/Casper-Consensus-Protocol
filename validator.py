@@ -1,11 +1,9 @@
-
 from block import Block, Dynasty
 from message import VoteMessage
 from parameters import *
-import random
+
 # Root of the blockchain
 ROOT = Block()
-
 
 class Validator(object):
     """Abstract class for validators."""
@@ -31,12 +29,11 @@ class Validator(object):
         self.finalised_dynasties = set()
         self.finalised_dynasties.add(Dynasty(INITIAL_VALIDATORS, 0))
 
-        # My current epoch - height I'm working at
+        # My current epoch
         self.current_height = 0
-
         # Network I am connected to
         self.network = network
-
+        network.nodes.append(self)
         # Tails are for checkpoint blocks, the tail is the last block
         # (before the next checkpoint) following the checkpoint
         self.tails = {ROOT.hash: ROOT}
@@ -44,9 +41,6 @@ class Validator(object):
         # Closest checkpoint ancestor for each block
         self.tail_membership = {ROOT.hash: ROOT.hash}
         self.id = id
-
-        # Flag is has been slashed since last Byantine message
-        self.slashed = False
 
     # If we processed an object but did not receive some dependencies
     # needed to process it, save it to be processed later
@@ -114,24 +108,10 @@ class Validator(object):
         # .. At time NUM_VALIDATORS * BLOCK_PROPOSAL_TIME: validator 0
         if self.id == (time // BLOCK_PROPOSAL_TIME) % NUM_VALIDATORS and time % BLOCK_PROPOSAL_TIME == 0:
 
-            if random.randint(1, 10) == 11 and len(self.proposed_blocks) > 0:
+            # One node is authorized to create a new block and broadcast it
+            new_block = Block(self.head, self.finalised_dynasties)
+            self.proposed_blocks.append(new_block)
 
-                print("BYZANTINE")
-
-                block = self.proposed_blocks[0]
-
-                self.proposed_blocks.append(block)
-
-                self.network.broadcast(block)
-                # immediately "receive" the new block (no network latency)
-                self.on_receive(block)
-
-            else:
-
-                # One node is authorized to create a new block and broadcast it
-                new_block = Block(self.head, self.finalised_dynasties)
-                self.proposed_blocks.append(new_block)
-
-                self.network.broadcast(new_block)
-                # immediately "receive" the new block (no network latency)
-                self.on_receive(new_block)
+            self.network.broadcast(new_block)
+            # immediately "receive" the new block (no network latency)
+            self.on_receive(new_block)

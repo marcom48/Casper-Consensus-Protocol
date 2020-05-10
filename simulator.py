@@ -18,16 +18,14 @@ if __name__ == '__main__':
     if not os.path.exists(LOG_DIR):
         os.makedirs(LOG_DIR)
 
-    network = Network(AVG_LATENCY)
+    network = Network(exponential_latency(AVG_LATENCY))
     validators = [VoteValidator(network, i) for i in VALIDATOR_IDS]
-
-    # Add nodes to network
-    network.add_nodes(validators)
 
     num_epochs = 50
     for t in range(BLOCK_PROPOSAL_TIME * EPOCH_SIZE * num_epochs):
         start = time.time()
         network.tick()
+        print("Took {} seconds for one tick".format(time.time() - start))
 
         if t % (BLOCK_PROPOSAL_TIME * EPOCH_SIZE) == 0:
             filename = os.path.join(LOG_DIR, "plot_{:03d}.png".format(t))

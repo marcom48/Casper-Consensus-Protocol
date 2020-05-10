@@ -1,6 +1,6 @@
 import random
 from message import VoteMessage
-from parameters import INITIAL_DEPOSIT, NUM_VALIDATORS
+from parameters import *
 
 
 class Network(object):
@@ -35,7 +35,6 @@ class Network(object):
     def reward_node(self, node):
         for n in self.nodes:
             if n.id == node:
-
                 self.total_deposit += n.reward()
                 break
 
@@ -47,8 +46,7 @@ class Network(object):
         when tick() is called.
 
         """
-        if isinstance(msg, VoteMessage):
-            print(f"Network {msg}")
+
         for node in self.nodes:
             # Create a different delay for every receiving node i
             # Delays need to be at least 1

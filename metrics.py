@@ -5,7 +5,7 @@ from parameters import *
 from block import Block
 from utils import exponential_latency
 from network import Network
-from votemessagevalidator import VoteValidator
+from votevalidator import VoteValidator
 from plot_graph import plot_node_blockchains
 
 
@@ -32,8 +32,7 @@ def fraction_justified_and_finalised(validator):
     fraction_justified = float(count_justified) / float(count_total)
     fraction_finalised = float(count_finalised) / float(count_total)
     count_forked_justified = len(validator.justified) - count_justified
-    fraction_forked_justified = float(
-        count_forked_justified) / float(count_total)
+    fraction_forked_justified = float(count_forked_justified) / float(count_total)
     return fraction_justified, fraction_finalised, fraction_forked_justified
 
 
@@ -95,16 +94,14 @@ def count_forks(validator):
                     block_hash = block.prevhash
                     block = validator.processed[block_hash]
                 assert block_hash in main_blocks
-                longest_fork[block_hash] = max(
-                    longest_fork.get(block_hash, 0), fork_length)
+                longest_fork[block_hash] = max(longest_fork.get(block_hash, 0), fork_length)
 
     count_forks = {}
     for block_hash in main_blocks:
         l = longest_fork[block_hash]
         count_forks[l] = count_forks.get(l, 0) + 1
 
-    assert sum(count_forks.values()
-               ) == validator.highest_justified_checkpoint.height + 1
+    assert sum(count_forks.values()) == validator.highest_justified_checkpoint.height + 1
     return count_forks
 
 
@@ -117,9 +114,8 @@ def print_metrics_latency(latencies, num_tries, validator_set=VALIDATOR_IDS):
         busum = 0.0
         #fcsum = {}
         for i in range(num_tries):
-            network = Network(exponential_latency(latency))
-            validators = [VoteValidator(
-                network, i) for i in validator_set]
+            network = Network(latency)
+            validators = [VoteValidator(network, i) for i in validator_set]
 
             for t in range(BLOCK_PROPOSAL_TIME * EPOCH_SIZE * 50):
                 network.tick()
@@ -135,24 +131,21 @@ def print_metrics_latency(latencies, num_tries, validator_set=VALIDATOR_IDS):
                 mcsum += main_chain_size(val)
                 busum += blocks_under_highest_justified(val)
                 #fc = count_forks(val)
-                # for l in fc.keys():
-                #fcsum[l] = fcsum.get(l, 0) + fc[l]
+                #for l in fc.keys():
+                    #fcsum[l] = fcsum.get(l, 0) + fc[l]
 
         print('Latency: {}'.format(latency))
         print('Justified: {}'.format(jfsum / len(validators) / num_tries))
-        print('Finalized: {}'.format(ffsum / len(validators) / num_tries))
-        print('Justified in forks: {}'.format(
-            jffsum / len(validators) / num_tries))
-        print('Main chain size: {}'.format(
-            mcsum / len(validators) / num_tries))
-        print('Blocks under main justified: {}'.format(
-            busum / len(validators) / num_tries))
+        print('finalised: {}'.format(ffsum / len(validators) / num_tries))
+        print('Justified in forks: {}'.format(jffsum / len(validators) / num_tries))
+        print('Main chain size: {}'.format(mcsum / len(validators) / num_tries))
+        print('Blocks under main justified: {}'.format(busum / len(validators) / num_tries))
         print('Main chain fraction: {}'.format(
             mcsum / (len(validators) * num_tries * (EPOCH_SIZE * 50 + 1))))
-        # for l in sorted(fcsum.keys()):
-        # if l > 0:
-        #frac = float(fcsum[l]) / float(fcsum[0])
-        #print('Fraction of forks of size {}: {}'.format(l, frac))
+        #for l in sorted(fcsum.keys()):
+            #if l > 0:
+                #frac = float(fcsum[l]) / float(fcsum[0])
+                #print('Fraction of forks of size {}: {}'.format(l, frac))
         print('')
 
 
@@ -174,7 +167,7 @@ if __name__ == '__main__':
 
         # Uncomment to have different latencies
         #latencies = [i for i in range(10, 300, 20)] + [500, 750, 1000]
-        latencies = [100]
-        num_tries = 10  # number of samples for each set of parameters
+        latencies = [5,10,15]
+        num_tries = 5  # number of samples for each set of parameters
 
         print_metrics_latency(latencies, num_tries, validator_set)
