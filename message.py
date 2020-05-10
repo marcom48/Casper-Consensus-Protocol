@@ -10,7 +10,6 @@ class VoteMessage():
         self.source_height = source_height
         self.target_height = target_height
         self.validator = validator
-        # self.hash = utils.generate_hash()
         self.hash = utils.generate_hash()
         self.deposit = deposit
 

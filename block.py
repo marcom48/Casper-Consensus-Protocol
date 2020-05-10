@@ -28,24 +28,30 @@ class Block():
         """
         self.hash = utils.generate_hash()
 
-        # If we are genesis block, set initial values
+        # Genesis block
         if not parent:
+            
             self.height = 0
+
             self.parent_hash = 0
-            self.rear_validators = self.forward_validators = Dynasty(
+            
+            # Rear and forward validators equal
+            self.rear_validators = self.forward_validators = BlockDynasty(
                 INITIAL_VALIDATORS, 0)
+            
             self.next_dynasty = self.generate_next_dynasty(
                 self.forward_validators.id)
         else:
 
-            # Set our block height and our parent_hash
             self.height = parent.height + 1
             self.parent_hash = parent.hash
 
             # Generate a random next dynasty
             self.next_dynasty = self.generate_next_dynasty(
                 parent.forward_validators.id)
+
             # If the forward_validators was finalised, we advance to the next dynasty
+            
             if parent.forward_validators in finalised_dynasties:
                 self.rear_validators = parent.forward_validators
                 self.forward_validators = parent.next_dynasty
@@ -60,7 +66,7 @@ class Block():
     def generate_next_dynasty(self, rear_validators_id):
         # Fix the seed so that every validator can generate the same dynasty
         random.seed(self.hash)
-        next_dynasty = Dynasty(random.sample(
+        next_dynasty = BlockDynasty(random.sample(
             VALIDATOR_IDS, NUM_VALIDATORS), rear_validators_id + 1)
 
         # Remove the seed for other operations
@@ -68,15 +74,7 @@ class Block():
         return next_dynasty
 
 
-class Dynasty():
-    """A Dynasty is a certain set of validators.
-
-    It will represent the set of valid validators for a certain block.
-
-    Args:
-        validators: set of validators in the dynasty
-        id: id of the dynasty
-    """
+class BlockDynasty():
 
     def __init__(self, validators, _id):
         self.validators = validators

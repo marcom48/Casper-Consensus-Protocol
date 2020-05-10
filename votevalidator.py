@@ -1,5 +1,6 @@
 
-from block import Block, Dynasty
+
+from block import Block, BlockDynasty
 from message import VoteMessage
 from parameters import *
 from validator import ROOT, Validator
@@ -123,22 +124,7 @@ class VoteValidator(Validator):
         # 'highest justified checkpoint.')
         max_height = self.highest_justified_checkpoint.height
         max_descendant = self.highest_justified_checkpoint.hash
-        # changed = False
-        # for _hash in self.tails:
-        #     # if the tail is descendant to the highest justified checkpoint
-        #     # TODO: bug with is_ancestor? see higher
-        #     if self.is_ancestor(self.highest_justified_checkpoint, _hash):
-        #         # good.append(_hash)
-        #         new_height = self.processed[_hash].height
-        #         if new_height > max_height:
-        #             changed = True
-        #             max_height = new_height
-        #             max_descendant = _hash
 
-        # self.main_chain_size = max_height
-        # self.head = self.processed[max_descendant]
-        # if not changed:
-        #     print("NOT")
 
         # Find all tails that highest checkpoint is ancestor of
         descendants = list(self.tails.keys()).copy()        
@@ -181,32 +167,40 @@ class VoteValidator(Validator):
         # BNO: The source will be the justified checkpoint of greatest height
         source_block = self.highest_justified_checkpoint
 
-
         # If the block is an epoch block of a higher epoch than what we've seen so far
         # This means that it's the first time we see a checkpoint at this height
         # It also means we never voted for any other checkpoint at this height (rule 1)
         if target_block.checkpoint_height > self.current_height:
             assert target_block.checkpoint_height > source_block.checkpoint_height, ("target epoch: {},"
-            "source epoch: {}".format(target_block.checkpoint_height, source_block.checkpoint_height))
+                                                                                     "source epoch: {}".format(target_block.checkpoint_height, source_block.checkpoint_height))
 
             # print('Validator %d: now in epoch %d' % (self.id, target_block.checkpoint_height))
             # Increment our epoch
             self.current_height = target_block.checkpoint_height
 
-            # if the target_block is a descendent of the source_block, send
-            # a vote
+            
             if self.is_ancestor(source_block, target_block):
-                # print('Validator %d: Voting %d for epoch %d with epoch source %d' %
-                      # (self.id, target_block.hash, target_block.checkpoint_height,
-                       # source_block.checkpoint_height))
 
-                vote = VoteMessage(source_block.hash,
-                            target_block.hash,
-                            source_block.checkpoint_height,
-                            target_block.checkpoint_height,
-                            self.id, 100)
-                self.network.broadcast(vote)
-                assert self.processed[target_block.hash]
+
+                if random.randint(1, 40) > 20 and len(self.proposed_votes) > 0 and BYZANTINE:
+
+
+                    self.slashed = False
+                    self.proposed_votes.append(self.proposed_votes[0])
+                    self.network.broadcast(self.proposed_votes[0])
+                    assert self.processed[target_block.hash]
+
+                else:
+                    vote = VoteMessage(source_block.hash,
+                                       target_block.hash,
+                                       source_block.checkpoint_height,
+                                       target_block.checkpoint_height,
+                                       self.id, self.deposit)
+
+                    #print(f"Sent {vote} ")
+                    self.proposed_votes.append(vote)
+                    self.network.broadcast(vote)
+                    assert self.processed[target_block.hash]
 
     def accept_vote(self, vote):
         """Called on receiving a vote message.
@@ -247,14 +241,14 @@ class VoteValidator(Validator):
         for past_vote in self.votes[vote.validator]:
             if past_vote.target_height == vote.target_height:
                 # TODO: SLASH
-                print('You just got slashed.')
+                # print('You just got slashed.')
                 return False
 
             if ((past_vote.source_height < vote.source_height and
                  past_vote.target_height > vote.target_height) or
                (past_vote.source_height > vote.source_height and
                  past_vote.target_height < vote.target_height)):
-                print('You just got slashed.')
+                # print('You just got slashed.')
                 return False
 
         # Add the vote to the map of votes
@@ -278,6 +272,7 @@ class VoteValidator(Validator):
             # If the source was a direct parent of the target, the source
             # is finalised
             if vote.source_height == vote.target_height - 1:
+                self.network.reward_node(id)
                 self.finalised.add(vote.source)
         return True
 
