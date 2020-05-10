@@ -21,29 +21,36 @@ class Validator(object):
         # commit messages processed before we reached 2/3 prepares
 
         # Looks to be anything that isn't finished.
-        self.dependencies = {}
+        self.buffer = {}
 
         self.proposed_blocks = []
 
-        # My current epoch
+        # Current height validator is building on.
         self.current_height = 0
-        # Network I am connected to
+
         self.network = network
-        network.nodes.append(self)
+
+        network.register(self)
+
         # Tails are for checkpoint blocks, the tail is the last block
         # (before the next checkpoint) following the checkpoint
         self.tails = {ROOT.hash: ROOT}
 
         # Closest checkpoint ancestor for each block
         self.tail_membership = {ROOT.hash: ROOT.hash}
+        
         self.id = id
 
-    # If we processed an object but did not receive some dependencies
+    # If we processed an object but did not receive some buffer
     # needed to process it, save it to be processed later
-    def add_dependency(self, hash_, obj):
-        if hash_ not in self.dependencies:
-            self.dependencies[hash_] = []
-        self.dependencies[hash_].append(obj)
+    def add_to_buffer(self, _hash, obj):
+        
+        # Assert not already in buffer.
+        if _hash not in self.buffer:
+            self.buffer[_hash] = [obj]
+        else:
+                    
+            self.buffer[_hash].append(obj)
 
     # Get the checkpoint immediately before a given checkpoint
     def get_checkpoint_parent(self, block):
@@ -55,21 +62,13 @@ class Validator(object):
         return self.processed[self.tail_membership[block.parent_hash]]
 
     def is_ancestor(self, ancestor, descendant):
-        """Is a given checkpoint an ancestor of another given checkpoint?
-        Args:
-            anc: ancestor block (or block hash)
-            desc: descendant block (or block hash)
-        """
-        # if anc or desc are block hashes, we can get the blocks from self.processed
+        
+        # Get block via hash if provided.
         if not isinstance(ancestor, Block):
             ancestor = self.processed[ancestor]
 
         if not isinstance(descendant, Block):
             descendant = self.processed[descendant]
-
-        # Check that the blocks are both checkpoints
-        assert ancestor.height % EPOCH_SIZE == 0
-        assert descendant.height % EPOCH_SIZE == 0
 
         while True:
             if descendant is None:
@@ -78,17 +77,22 @@ class Validator(object):
                 return True
             descendant = self.get_checkpoint_parent(descendant)
 
-
+    # Slash a validator.
     def slash(self):
         
         if not self.slashed:
-
+            # Reduce by 10%
             x = self.deposit * 0.1
             self.deposit -= x
+
+            # Mark as slashed for current Byzantine message.
+            # PERHAPS ADD DICT WITH MESSAGE AS KEY TO MARK AS SLASHED FOR THAT MESSAGE
             self.slashed = True
+            
             return x
         return 0
 
+    # Reward a validator.
     def reward(self):
         
         x = self.deposit * 0.1
@@ -98,15 +102,16 @@ class Validator(object):
 
     # Called every round
     def tick(self, time):
-        # At time 0: validator 0
-        # At time BLOCK_PROPOSAL_TIME: validator 1
-        # .. At time NUM_VALIDATORS * BLOCK_PROPOSAL_TIME: validator 0
+        
+        # Propose a new block.
         if self.id == (time // BLOCK_PROPOSAL_TIME) % NUM_VALIDATORS and time % BLOCK_PROPOSAL_TIME == 0:
 
-            # One node is authorized to create a new block and broadcast it
+            
             new_block = Block(self.head)
+            
             self.proposed_blocks.append(new_block)
 
             self.network.broadcast(new_block)
-            # immediately "receive" the new block (no network latency)
-            self.on_receive(new_block)
+            
+            # No latency to self.
+            self.deliver(new_block)

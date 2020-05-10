@@ -17,8 +17,10 @@ class Network(object):
 
         self.total_deposit = INITIAL_DEPOSIT * NUM_VALIDATORS
 
-    def add_nodes(self, _nodes):
-        self.nodes = _nodes
+
+    def register(self, node):
+        self.nodes.append(node)
+
 
     def generate_latency(self):
         return 1 + int(random.expovariate(1) * self.latency)
@@ -67,7 +69,7 @@ class Network(object):
 
             for node_index, msg in self.msg_arrivals[self.time]:
 
-                self.nodes[node_index].on_receive(msg)
+                self.nodes[node_index].deliver(msg)
 
             del self.msg_arrivals[self.time]
 

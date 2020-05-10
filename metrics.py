@@ -23,15 +23,15 @@ def fraction_justified_and_finalised(validator):
     count_total = 0
     while checkpoint is not None:
         count_total += 1
-        if checkpoint.hash in validator.justified:
+        if checkpoint.hash in validator.justified_checkpoints:
             count_justified += 1
-        if checkpoint.hash in validator.finalised:
+        if checkpoint.hash in validator.finalised_checkpoints:
             count_finalised += 1
         checkpoint = validator.get_checkpoint_parent(checkpoint)
 
     fraction_justified = float(count_justified) / float(count_total)
     fraction_finalised = float(count_finalised) / float(count_total)
-    count_forked_justified = len(validator.justified) - count_justified
+    count_forked_justified = len(validator.justified_checkpoints) - count_justified
     fraction_forked_justified = float(count_forked_justified) / float(count_total)
     return fraction_justified, fraction_finalised, fraction_forked_justified
 

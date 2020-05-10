@@ -12,8 +12,6 @@ class VoteValidator(Validator):
     def __init__(self, network, id):
         super(VoteValidator, self).__init__(network, id)
 
-        # the head is the latest block processed descendant of the highest
-        # justified checkpoint
         self.head = ROOT
 
         self.deposit = INITIAL_DEPOSIT
@@ -22,39 +20,33 @@ class VoteValidator(Validator):
 
         self.main_chain_size = 1
 
+        # Votes proposed to network.
         self.proposed_votes = []
 
         # Set of justified block hashes
-        self.justified = {ROOT.hash}
+        self.justified_checkpoints = {ROOT.hash}
 
-        # Set of finalised block hashes
-        self.finalised = {ROOT.hash}
+        # Finalised blocks
+        self.finalised_checkpoints = {ROOT.hash}
 
-        # Map {validator -> votes}
-        # Contains all the votes, and allow us to see who voted for whom
-        # Used to check for the slashing conditions
+        # Record of previous votes for each validator.
+        # Used to test slashing conditions.
         self.votes = {}
 
-        # Map {source_hash -> {target_hash -> count}} to count the votes
-        # ex: self.vote_count[source][target] will be between 0 and NUM_VALIDATORS
+        # Record of number of votes for each proposed block.
         self.vote_count = {}
+    
 
-    # TODO: we could write function is_justified only based on self.processed and self.votes
-    #       (note that the votes are also stored in self.processed)
+    # Check a checkpoitn is justified.
     def is_justified(self, _hash):
 
-        return (_hash in self.justified) and (_hash in self.processed) and (self.processed[_hash].is_checkpoint)
+        return (_hash in self.justified_checkpoints) and (_hash in self.processed) and (self.processed[_hash].is_checkpoint)
 
+    # Check a checkpoint is finalised
     def is_finalised(self, _hash):
-        return (_hash in self.finalised) and (_hash in self.processed) and (self.processed[_hash].is_checkpoint)
+        return (_hash in self.finalised_checkpoints) and (_hash in self.processed) and (self.processed[_hash].is_checkpoint)
 
-    @property
-    def head(self):
-        return self._head
 
-    @head.setter
-    def head(self, value):
-        self._head = value
 
     def accept_block(self, block):
         """Called on receiving a block
@@ -63,11 +55,11 @@ class VoteValidator(Validator):
             block: block processed
 
         Returns:
-            True if block was accepted or False if we are missing dependencies
+            True if block was accepted or False if we are missing buffer
         """
         # If we didn't receive the block's parent yet, wait
         if block.parent_hash not in self.processed:
-            self.add_dependency(block.parent_hash, block)
+            self.add_to_buffer(block.parent_hash, block)
             return False
 
         # We receive the block
@@ -204,12 +196,15 @@ class VoteValidator(Validator):
     def slashing_conditions(self, new_vote):
         # Check the slashing conditions
         for past_vote in self.votes[new_vote.validator]:
+
+            # No duplicate target heights.
             if past_vote.target_height == new_vote.target_height:
 
                 self.network.slash_node(new_vote.validator)
 
                 return False
 
+            # No voting within previous votes.
             if ((past_vote.source_height < new_vote.source_height and
                  past_vote.target_height > new_vote.target_height) or
                (past_vote.source_height > new_vote.source_height and
@@ -224,15 +219,15 @@ class VoteValidator(Validator):
 
        # If the block has not yet been processed, wait
         if vote.source not in self.processed:
-            self.add_dependency(vote.source, vote)
+            self.add_to_buffer(vote.source, vote)
 
         # Check that the source is justified
-        if vote.source not in self.justified :
+        if vote.source not in self.justified_checkpoints :
             return False
 
         # If the target has not yet been processed, wait
         if vote.target not in self.processed:
-            self.add_dependency(vote.target, vote)
+            self.add_to_buffer(vote.target, vote)
             return False
 
         # If the target is not a descendent of the source, ignore the vote
@@ -260,41 +255,52 @@ class VoteValidator(Validator):
         self.vote_count[vote.source][vote.target] = self.vote_count[
             vote.source].get(vote.target, 0) + vote.deposit
 
-        # TODO: we do not deal with finalised dynasties (the pool of validator
-        # is always the same right now)
+
         # If there are enough votes, process them
         if (self.vote_count[vote.source][vote.target] > (self.network.total_deposit * 2) // 3):
             # Mark the target as justified
-            self.justified.add(vote.target)
+            self.justified_checkpoints.add(vote.target)
             if vote.target_height > self.highest_justified_checkpoint.checkpoint_height:
                 self.highest_justified_checkpoint = self.processed[vote.target]
 
             # If the source was a direct parent of the target, the source
             # is finalised
             if vote.source_height == vote.target_height - 1:
+
+                # Reward node for finalising block.
                 self.network.reward_node(id)
-                self.finalised.add(vote.source)
+
+                self.finalised_checkpoints.add(vote.source)
+        
         return True
 
     # Called on processing any object
-    def on_receive(self, obj):
+    def deliver(self, obj):
 
         # Ignore duplicate votes.
+        # CAN THIS JUST BE REMOVED
         if not BYZANTINE and obj.hash in self.processed:
             return False
 
+        # Received proposed block.
         if isinstance(obj, Block):
-            result = self.accept_block(obj)
+            accepted = self.accept_block(obj)
 
-
-        elif isinstance(obj, VoteMessage):
-            result = self.accept_vote(obj)
+        # Received vote.
+        else:
+            accepted = self.accept_vote(obj)
         
-        # If the object was successfully processed
-        # (ie. not flagged as having unsatisfied dependencies)
-        if result:
+        
+        if accepted:
+
+            # Record message hash to not process again.
             self.processed[obj.hash] = obj
-            if obj.hash in self.dependencies:
-                for d in self.dependencies[obj.hash]:
-                    self.on_receive(d)
-                del self.dependencies[obj.hash]
+
+            # Check if any previous messages required current message.
+            if obj.hash in self.buffer:
+
+                for d in self.buffer[obj.hash]:
+                    self.deliver(d)
+
+                # Remove previous message.
+                del self.buffer[obj.hash]
