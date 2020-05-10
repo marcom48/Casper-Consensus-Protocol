@@ -4,10 +4,10 @@
 import os
 import time
 
-from block import Block, Dynasty
+from block import Block
 from utils import exponential_latency
 from network import Network
-from message import VoteMessage
+from network import VoteMessage
 from votevalidator import VoteValidator
 from plot_graph import plot_node_blockchains
 from parameters import *

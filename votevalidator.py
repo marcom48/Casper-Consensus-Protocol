@@ -1,7 +1,7 @@
 
 
-from block import Block, BlockDynasty
-from message import VoteMessage
+from block import Block
+from network import VoteMessage
 from parameters import *
 from validator import ROOT, Validator
 import random
@@ -182,8 +182,7 @@ class VoteValidator(Validator):
             if self.is_ancestor(source_block, target_block):
 
 
-                if random.randint(1, 40) > 20 and len(self.proposed_votes) > 0 and BYZANTINE:
-
+                if random.randint(1, 40) > 30 and len(self.proposed_votes) > 0 and BYZANTINE:
 
                     self.slashed = False
                     self.proposed_votes.append(self.proposed_votes[0])
@@ -202,19 +201,33 @@ class VoteValidator(Validator):
                     self.network.broadcast(vote)
                     assert self.processed[target_block.hash]
 
+    def slashing_conditions(self, new_vote):
+        # Check the slashing conditions
+        for past_vote in self.votes[new_vote.validator]:
+            if past_vote.target_height == new_vote.target_height:
+
+                self.network.slash_node(new_vote.validator)
+
+                return False
+
+            if ((past_vote.source_height < new_vote.source_height and
+                 past_vote.target_height > new_vote.target_height) or
+               (past_vote.source_height > new_vote.source_height and
+                 past_vote.target_height < new_vote.target_height)):
+
+
+                return False
+
+        return True
+
     def accept_vote(self, vote):
-        """Called on receiving a vote message.
-        """
-        # print('Node %d: got a vote' % self.id, source.view, prepare.view_source,
-              # prepare.blockhash, vote.blockhash in self.processed)
 
        # If the block has not yet been processed, wait
         if vote.source not in self.processed:
             self.add_dependency(vote.source, vote)
 
-        # Check that the source is processed and justified
-        # TODO: If the source is not justified, add to dependencies?
-        if vote.source not in self.justified:
+        # Check that the source is justified
+        if vote.source not in self.justified :
             return False
 
         # If the target has not yet been processed, wait
@@ -226,30 +239,17 @@ class VoteValidator(Validator):
         if not self.is_ancestor(vote.source, vote.target):
             return False
 
-        # If the validator is not in the block's dynasty, ignore the vote
-        # TODO: is it really vote.target? (to check dynasties)
-        # TODO: reorganize dynasties like the paper
-        if vote.validator not in self.processed[vote.target].forward_validators.validators and \
-            vote.validator not in self.processed[vote.target].rear_validators.validators:
+        # Not necessary for static validator set, but present to demonstrate algorithm condition.
+        if vote.validator not in self.processed[vote.target].validators:
             return False
 
-        # Initialize self.votes[vote.validator] if necessary
+        # Create record of validators votes.
         if vote.validator not in self.votes:
             self.votes[vote.validator] = []
 
         # Check the slashing conditions
-        for past_vote in self.votes[vote.validator]:
-            if past_vote.target_height == vote.target_height:
-                # TODO: SLASH
-                # print('You just got slashed.')
-                return False
-
-            if ((past_vote.source_height < vote.source_height and
-                 past_vote.target_height > vote.target_height) or
-               (past_vote.source_height > vote.source_height and
-                 past_vote.target_height < vote.target_height)):
-                # print('You just got slashed.')
-                return False
+        if not self.slashing_conditions(vote):
+            return False
 
         # Add the vote to the map of votes
         self.votes[vote.validator].append(vote)
@@ -278,16 +278,21 @@ class VoteValidator(Validator):
 
     # Called on processing any object
     def on_receive(self, obj):
-        if not BYZANTINE and  obj.hash in self.processed:
+
+        # Ignore duplicate votes.
+        if not BYZANTINE and obj.hash in self.processed:
             return False
 
         if isinstance(obj, Block):
-            o = self.accept_block(obj)
+            result = self.accept_block(obj)
+
+
         elif isinstance(obj, VoteMessage):
-            o = self.accept_vote(obj)
+            result = self.accept_vote(obj)
+        
         # If the object was successfully processed
         # (ie. not flagged as having unsatisfied dependencies)
-        if o:
+        if result:
             self.processed[obj.hash] = obj
             if obj.hash in self.dependencies:
                 for d in self.dependencies[obj.hash]:

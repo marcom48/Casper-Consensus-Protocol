@@ -1,5 +1,5 @@
-from block import Block, BlockDynasty
-from message import VoteMessage
+from block import Block
+from network import VoteMessage
 from parameters import *
 
 # Root of the blockchain
@@ -24,10 +24,6 @@ class Validator(object):
         self.dependencies = {}
 
         self.proposed_blocks = []
-
-        # Set of finalised dynasties
-        self.finalised_dynasties = set()
-        self.finalised_dynasties.add(BlockDynasty(INITIAL_VALIDATORS, 0))
 
         # My current epoch
         self.current_height = 0
@@ -86,11 +82,10 @@ class Validator(object):
     def slash(self):
         
         if not self.slashed:
-            print("SLASHING")
-            x = self.deposit * 0.2
+
+            x = self.deposit * 0.1
             self.deposit -= x
             self.slashed = True
-            print(f"{self.id}, {self.deposit}")
             return x
         return 0
 
@@ -109,7 +104,7 @@ class Validator(object):
         if self.id == (time // BLOCK_PROPOSAL_TIME) % NUM_VALIDATORS and time % BLOCK_PROPOSAL_TIME == 0:
 
             # One node is authorized to create a new block and broadcast it
-            new_block = Block(self.head, self.finalised_dynasties)
+            new_block = Block(self.head)
             self.proposed_blocks.append(new_block)
 
             self.network.broadcast(new_block)
