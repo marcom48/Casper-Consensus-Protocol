@@ -3,7 +3,6 @@ import numpy as np
 
 from parameters import *
 from block import Block
-from utils import exponential_latency
 from network import Network
 from votevalidator import VoteValidator
 from plot_graph import plot_node_blockchains
@@ -23,15 +22,15 @@ def fraction_justified_and_finalised(validator):
     count_total = 0
     while checkpoint is not None:
         count_total += 1
-        if checkpoint.hash in validator.justified:
+        if checkpoint.hash in validator.justified_checkpoints:
             count_justified += 1
-        if checkpoint.hash in validator.finalised:
+        if checkpoint.hash in validator.finalised_checkpoints:
             count_finalised += 1
         checkpoint = validator.get_checkpoint_parent(checkpoint)
 
     fraction_justified = float(count_justified) / float(count_total)
     fraction_finalised = float(count_finalised) / float(count_total)
-    count_forked_justified = len(validator.justified) - count_justified
+    count_forked_justified = len(validator.justified_checkpoints) - count_justified
     fraction_forked_justified = float(count_forked_justified) / float(count_total)
     return fraction_justified, fraction_finalised, fraction_forked_justified
 
@@ -117,9 +116,9 @@ def print_metrics_latency(latencies, num_tries, validator_set=VALIDATOR_IDS):
             network = Network(latency)
             validators = [VoteValidator(network, i) for i in validator_set]
 
-            for t in range(BLOCK_PROPOSAL_TIME * EPOCH_SIZE * 50):
+            for t in range(BLOCK_PROPOSAL_TIME * CHECKPOINT_DIFF * 50):
                 network.tick()
-                # if t % (BLOCK_PROPOSAL_TIME * EPOCH_SIZE) == 0:
+                # if t % (BLOCK_PROPOSAL_TIME * CHECKPOINT_DIFF) == 0:
                 #     filename = os.path.join(LOG_DIR, 'plot_{:03d}.png'.format(t))
                 #     plot_node_blockchains(validators, filename)
 
@@ -141,7 +140,7 @@ def print_metrics_latency(latencies, num_tries, validator_set=VALIDATOR_IDS):
         print('Main chain size: {}'.format(mcsum / len(validators) / num_tries))
         print('Blocks under main justified: {}'.format(busum / len(validators) / num_tries))
         print('Main chain fraction: {}'.format(
-            mcsum / (len(validators) * num_tries * (EPOCH_SIZE * 50 + 1))))
+            mcsum / (len(validators) * num_tries * (CHECKPOINT_DIFF * 50 + 1))))
         #for l in sorted(fcsum.keys()):
             #if l > 0:
                 #frac = float(fcsum[l]) / float(fcsum[0])

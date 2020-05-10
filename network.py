@@ -1,31 +1,33 @@
 import random
-from message import VoteMessage
 from parameters import *
+import utils
+from block import Block
+from collections import defaultdict
 
 
 class Network(object):
-    """Networking layer controlling the delivery of messages between nodes.
-
-    self.msg_arrivals is a table where the keys are the time of arrival of
-        messages and the values is a list of the objects received at that time
-    """
 
     def __init__(self, _latency):
-        self.nodes = []
+
+        self.validators = []
         self.time = 0
-        self.msg_arrivals = {}
+        self.messages = defaultdict(list)
         self.latency = _latency
 
+        # Total sum of deposits across validators.
         self.total_deposit = INITIAL_DEPOSIT * NUM_VALIDATORS
 
-    def add_nodes(self, _nodes):
-        self.nodes = _nodes
+    # Regist a validator with the network.
+    def register(self, validators):
+        self.validators.append(validators)
+
 
     def generate_latency(self):
         return 1 + int(random.expovariate(1) * self.latency)
 
     def slash_node(self, node):
-        for n in self.nodes:
+
+        for n in self.validators:
             if n.id == node:
                 if not n.slashed:
                     self.total_deposit -= n.slash()
@@ -33,48 +35,57 @@ class Network(object):
 
     
     def reward_node(self, node):
-        for n in self.nodes:
+        for n in self.validators:
             if n.id == node:
                 self.total_deposit += n.reward()
                 break
 
     def broadcast(self, msg):
-        """
 
-        Prepares a message to be broadcast to the nodes.
-        Each message is prepared with an actual delivery time, and is sent
-        when tick() is called.
 
-        """
-
-        for node in self.nodes:
-            # Create a different delay for every receiving node i
-            # Delays need to be at least 1
+        for node in self.validators:
+            
+            # Create delay
             delay = self.generate_latency()
 
             deliver_time = self.time + delay
-            if not self.msg_arrivals.get(deliver_time):
-                self.msg_arrivals[deliver_time] = []
 
-            self.msg_arrivals[deliver_time].append((node.id, msg))
+            self.messages[deliver_time].append((node.id, msg))
 
     def tick(self):
-        """Simulates a tick of time.
 
-        """
+        # Check for messages to be sent
+        if self.time in self.messages:
 
-        # If there are messages to be sent at this time
-        if self.time in self.msg_arrivals:
+            for _id, msg in self.messages[self.time]:
 
-            for node_index, msg in self.msg_arrivals[self.time]:
+                self.validators[_id].deliver(msg)
 
-                self.nodes[node_index].on_receive(msg)
+            # Remove messages
+            del self.messages[self.time]
 
-            del self.msg_arrivals[self.time]
+        # Continue time in validators.
+        for node in self.validators:
 
-        # Simulate time tick across each node
-        for n in self.nodes:
-
-            n.tick(self.time)
+            node.tick(self.time)
 
         self.time += 1
+
+
+class VoteMessage():
+
+    def __init__(self, source, target, source_height, target_height, validator, deposit):
+        self.source = source
+        self.target = target
+        self.source_height = source_height
+        self.target_height = target_height
+
+        # Validator ID.
+        self.validator = validator
+        
+        # Unique hash for vote.
+        self.hash = utils.generate_hash()
+        
+        # Deposit from validator.
+        self.deposit = deposit
+

@@ -9,22 +9,15 @@ from parameters import *
 
 
 def node_checkpoints(node):
-    """Get all the checkpoints of a given node, i.e. all the blocks with height % EPOCH_LENGHT == 0
 
-    Args:
-        node: Node
-
-    Returns:
-        G: networkx directed graph of the checkpoints
-    """
     G = nx.DiGraph()
 
     # Use node.get_checkpoint_parent(block)
-    for block_hash in node.processed:
-        if isinstance(node.processed[block_hash], Block):
-            block = node.processed[block_hash]
+    for block_hash in node.received:
+        if isinstance(node.received[block_hash], Block):
+            block = node.received[block_hash]
             # Check that the block is a checkpoint
-            if block.height % EPOCH_SIZE == 0:
+            if block.height % CHECKPOINT_DIFF == 0:
                 G.add_node(block_hash)
 
                 # Check if this is not the genesis block
@@ -62,7 +55,7 @@ def plot_node_blockchains(nodes, image_file):
         pos = {}
         labels = {}
         for block_hash in list(G.nodes()):
-            block = node.processed[block_hash]
+            block = node.received[block_hash]
             # FOR PREPARE-COMMIT
             # if block_hash in node.committable:
             # FOR VOTE
@@ -73,7 +66,7 @@ def plot_node_blockchains(nodes, image_file):
                 color = 'b'
             colors.append(color)
 
-            height = block.height // EPOCH_SIZE
+            height = block.height // CHECKPOINT_DIFF
             pos[block_hash] = (random.gauss(0, 1), height)
 
         ax = plt.subplot(nrows, ncols, i + 1)

@@ -1,19 +1,16 @@
 
-
-from block import Block, BlockDynasty
-from message import VoteMessage
+from block import Block
+from network import VoteMessage
 from parameters import *
 from validator import ROOT, Validator
 import random
 
 class VoteValidator(Validator):
-    """Add the vote messages + slashing conditions capability"""
+
 
     def __init__(self, network, id):
         super(VoteValidator, self).__init__(network, id)
 
-        # the head is the latest block processed descendant of the highest
-        # justified checkpoint
         self.head = ROOT
 
         self.deposit = INITIAL_DEPOSIT
@@ -24,272 +21,222 @@ class VoteValidator(Validator):
 
         self.proposed_votes = []
 
-        # Set of justified block hashes
-        self.justified = {ROOT.hash}
+        # Justified checkpoints.
+        self.justified_checkpoints = {ROOT.hash}
 
-        # Set of finalised block hashes
-        self.finalised = {ROOT.hash}
+        # Finalised checkpoints
+        self.finalised_checkpoints = {ROOT.hash}
 
-        # Map {validator -> votes}
-        # Contains all the votes, and allow us to see who voted for whom
-        # Used to check for the slashing conditions
-        self.votes = {}
+        # Votes from all validators in network.
+        self.validator_votes = {}
 
-        # Map {source_hash -> {target_hash -> count}} to count the votes
-        # ex: self.vote_count[source][target] will be between 0 and NUM_VALIDATORS
-        self.vote_count = {}
+        # Record of votes for blocks.
+        self.block_vote_count = {}
 
-    # TODO: we could write function is_justified only based on self.processed and self.votes
-    #       (note that the votes are also stored in self.processed)
+    # Check if block is justified.
     def is_justified(self, _hash):
+        return (_hash in self.justified_checkpoints) and (_hash in self.received) and (self.received[_hash].is_checkpoint)
 
-        return (_hash in self.justified) and (_hash in self.processed) and (self.processed[_hash].is_checkpoint)
-
+    # Check if block is finalised.
     def is_finalised(self, _hash):
-        return (_hash in self.finalised) and (_hash in self.processed) and (self.processed[_hash].is_checkpoint)
+        return (_hash in self.finalised_checkpoints) and (_hash in self.received) and (self.received[_hash].is_checkpoint)
 
-    @property
-    def head(self):
-        return self._head
-
-    @head.setter
-    def head(self, value):
-        self._head = value
 
     def accept_block(self, block):
-        """Called on receiving a block
 
-        Args:
-            block: block processed
-
-        Returns:
-            True if block was accepted or False if we are missing dependencies
-        """
-        # If we didn't receive the block's parent yet, wait
-        if block.parent_hash not in self.processed:
-            self.add_dependency(block.parent_hash, block)
+        # Haven't recieved block's parent.
+        if block.parent_hash not in self.received:
+            self.add_message_buffer(block.parent_hash, block)
             return False
 
-        # We receive the block
-        self.processed[block.hash] = block
+        
+        self.received[block.hash] = block
 
-        # If it's an epoch block (in general)
-        # If it's a checkpoint
         if block.is_checkpoint:
 
             #  Start a tail object for it
-            self.tail_membership[block.hash] = block.hash
-            self.tails[block.hash] = block
+            self.path_membership[block.hash] = block.hash
+            self.paths[block.hash] = block
 
             # Maybe vote
-            self.maybe_vote_last_checkpoint(block)
+            self.create_vote(block)
 
-        # Otherwise...
         else:
-            # See if it's part of the longest tail, if so set the tail accordingly
-            assert block.parent_hash in self.tail_membership
 
-            # The new block is in the same tail as its parent
-            self.tail_membership[block.hash] = self.tail_membership[block.parent_hash]
+            # Assert in tail
+            assert block.parent_hash in self.path_membership
 
-            curr_tail = self.tail_membership[block.hash]
+            # Update block's tail to match its parent.
+            self.path_membership[block.hash] = self.path_membership[block.parent_hash]
 
-            # If the block has the highest height, it becomes the end of the tail
-            if block.height > self.tails[curr_tail].height:
-                self.tails[curr_tail] = block
+            curr_tail = self.path_membership[block.hash]
 
-        # This block is in the same path as the highest checkpoint
-        if self.is_ancestor(self.highest_justified_checkpoint, self.tail_membership[block.hash]):
+            # Adjust end of tail.
+            if block.height > self.paths[curr_tail].height:
+                self.paths[curr_tail] = block
+
+        if self.is_ancestor(self.highest_justified_checkpoint, self.path_membership[block.hash]):
+            
+            # Update current working head.
             self.head = block
             self.main_chain_size += 1
+
         else:
-            # Need to update where the current head is
+            
+            # Change path to find current highest head.
             self.fix_head(block)
 
         return True
 
+    # Adjust current head to highest checkpointed head 
     def fix_head(self, block):
-        """Reorganize the head to stay on the chain with the highest
-        justified checkpoint.
 
-        If we are on wrong chain, reset the head to be the highest descendent
-        among the chains containing the highest justified checkpoint.
-
-        Args:
-            block: latest block processed."""
-
-        # Find the highest descendant of the highest justified checkpoint
-        # and set it as head
-        # print('Wrong chain, reset the chain to be a descendant of the '
-        # 'highest justified checkpoint.')
         max_height = self.highest_justified_checkpoint.height
         max_descendant = self.highest_justified_checkpoint.hash
-
-
-        # Find all tails that highest checkpoint is ancestor of
-        descendants = list(self.tails.keys()).copy()        
+  
+        descendants = list(self.paths.keys()).copy()        
 
         descendants = list(filter(lambda a: self.is_ancestor(
             self.highest_justified_checkpoint, a), descendants))
 
+        # Sort tails by ascending height.
+        descendants.sort(key=lambda a: -self.received[a].height)
 
-        # # # Sort tails by ascending height.
-        descendants.sort(key=lambda a: -self.processed[a].height)
+        highest_desc = max(descendants, key = lambda a: self.received[a].height)
 
-        highest_desc = max(descendants, key = lambda a: self.processed[a].height)
+        # Update current height to highest.
+        if self.received[highest_desc].height > max_height:
+            self.main_chain_size = self.received[highest_desc].height
+            self.head = self.received[highest_desc]
 
 
+    def create_vote(self, block):
 
-        # Update height
-        # TODO: DOES THERE NEED TO BE AN IF?
-        if self.processed[highest_desc].height > max_height:
-            self.main_chain_size = self.processed[highest_desc].height
-            self.head = self.processed[highest_desc]
-        # else:
-        #     print("FALSE")
+        # assert block.height % CHECKPOINT_DIFF == 0, (
+        #     "Block {} is not a checkpoint.".format(block.hash))
 
-    def maybe_vote_last_checkpoint(self, block):
-        """Called after receiving a block.
-
-        Implement the fork rule:
-        maybe send a vote message where target is block
-        if we are on the chain containing the justified checkpoint of the
-        highest height, and we have never sent a vote for this height.
-
-        Args:
-            block: last block we processed
-        """
-        assert block.height % EPOCH_SIZE == 0, (
-            "Block {} is not a checkpoint.".format(block.hash))
-
-        # BNO: The target will be block (which is a checkpoint)
+        # Create blocks for supermajority link vote.
         target_block = block
-        # BNO: The source will be the justified checkpoint of greatest height
         source_block = self.highest_justified_checkpoint
 
-        # If the block is an epoch block of a higher epoch than what we've seen so far
-        # This means that it's the first time we see a checkpoint at this height
-        # It also means we never voted for any other checkpoint at this height (rule 1)
+        # Assert creating a block for a new height.
         if target_block.checkpoint_height > self.current_height:
-            assert target_block.checkpoint_height > source_block.checkpoint_height, ("target epoch: {},"
-                                                                                     "source epoch: {}".format(target_block.checkpoint_height, source_block.checkpoint_height))
 
-            # print('Validator %d: now in epoch %d' % (self.id, target_block.checkpoint_height))
-            # Increment our epoch
+            # assert target_block.checkpoint_height > source_block.checkpoint_height, ("target epoch: {},"
+            # "source epoch: {}".format(target_block.checkpoint_height, source_block.checkpoint_height))
+
+            # Adjust current working height.
             self.current_height = target_block.checkpoint_height
 
-            
             if self.is_ancestor(source_block, target_block):
+                
+                # ADD IN BYZANTINE BLOCKS
+                
+                vote = VoteMessage(source_block.hash,
+                            target_block.hash,
+                            source_block.checkpoint_height,
+                            target_block.checkpoint_height,
+                            self.id, self.deposit)
+                self.network.broadcast(vote)
+
+                assert self.received[target_block.hash]
 
 
-                if random.randint(1, 40) > 20 and len(self.proposed_votes) > 0 and BYZANTINE:
+    def slashing_conditions(self, new_vote):
+        for past_vote in self.validator_votes[new_vote.validator]:
+            if past_vote.target_height == new_vote.target_height:
+                # TODO: SLASH
+
+                # ADD IN SLASH
+
+                print('You just got slashed.')
+                return False
+
+            if ((past_vote.source_height < new_vote.source_height and
+                 past_vote.target_height > new_vote.target_height) or
+               (past_vote.source_height > new_vote.source_height and
+                 past_vote.target_height < new_vote.target_height)):
+                print('You just got slashed.')
+                return False
 
 
-                    self.slashed = False
-                    self.proposed_votes.append(self.proposed_votes[0])
-                    self.network.broadcast(self.proposed_votes[0])
-                    assert self.processed[target_block.hash]
+        return True
 
-                else:
-                    vote = VoteMessage(source_block.hash,
-                                       target_block.hash,
-                                       source_block.checkpoint_height,
-                                       target_block.checkpoint_height,
-                                       self.id, self.deposit)
+    def check_vote(self, vote):
 
-                    #print(f"Sent {vote} ")
-                    self.proposed_votes.append(vote)
-                    self.network.broadcast(vote)
-                    assert self.processed[target_block.hash]
 
-    def accept_vote(self, vote):
-        """Called on receiving a vote message.
-        """
-        # print('Node %d: got a vote' % self.id, source.view, prepare.view_source,
-              # prepare.blockhash, vote.blockhash in self.processed)
+       # Haven't received source block yet.
+        if vote.source not in self.received:
+            self.add_message_buffer(vote.source, vote)
 
-       # If the block has not yet been processed, wait
-        if vote.source not in self.processed:
-            self.add_dependency(vote.source, vote)
-
-        # Check that the source is processed and justified
-        # TODO: If the source is not justified, add to dependencies?
-        if vote.source not in self.justified:
+        # Assert source is justified.
+        if vote.source not in self.justified_checkpoints:
             return False
 
-        # If the target has not yet been processed, wait
-        if vote.target not in self.processed:
-            self.add_dependency(vote.target, vote)
+        # Haven't received target block.
+        if vote.target not in self.received:
+            self.add_message_buffer(vote.target, vote)
             return False
 
-        # If the target is not a descendent of the source, ignore the vote
+        # Assert source is ancestor of target.
         if not self.is_ancestor(vote.source, vote.target):
             return False
 
-        # If the validator is not in the block's dynasty, ignore the vote
-        # TODO: is it really vote.target? (to check dynasties)
-        # TODO: reorganize dynasties like the paper
-        if vote.validator not in self.processed[vote.target].forward_validators.validators and \
-            vote.validator not in self.processed[vote.target].rear_validators.validators:
+        # Create new record for validator if unseen.
+        if vote.validator not in self.validator_votes:
+            self.validator_votes[vote.validator] = []
+
+        # Check the slashing conditions,
+        if not self.slashing_conditions(vote):
             return False
 
-        # Initialize self.votes[vote.validator] if necessary
-        if vote.validator not in self.votes:
-            self.votes[vote.validator] = []
+        # Valid vote, add to record for validator.
+        self.validator_votes[vote.validator].append(vote)
 
-        # Check the slashing conditions
-        for past_vote in self.votes[vote.validator]:
-            if past_vote.target_height == vote.target_height:
-                # TODO: SLASH
-                # print('You just got slashed.')
-                return False
+        # Create block vote record.
+        if vote.source not in self.block_vote_count:
+            self.block_vote_count[vote.source] = {}
 
-            if ((past_vote.source_height < vote.source_height and
-                 past_vote.target_height > vote.target_height) or
-               (past_vote.source_height > vote.source_height and
-                 past_vote.target_height < vote.target_height)):
-                # print('You just got slashed.')
-                return False
-
-        # Add the vote to the map of votes
-        self.votes[vote.validator].append(vote)
-
-        # Add to the vote count
-        if vote.source not in self.vote_count:
-            self.vote_count[vote.source] = {}
-        self.vote_count[vote.source][vote.target] = self.vote_count[
+        # Update votes
+        self.block_vote_count[vote.source][vote.target] = self.block_vote_count[
             vote.source].get(vote.target, 0) + vote.deposit
 
-        # TODO: we do not deal with finalised dynasties (the pool of validator
-        # is always the same right now)
-        # If there are enough votes, process them
-        if (self.vote_count[vote.source][vote.target] > (self.network.total_deposit * 2) // 3):
-            # Mark the target as justified
-            self.justified.add(vote.target)
-            if vote.target_height > self.highest_justified_checkpoint.checkpoint_height:
-                self.highest_justified_checkpoint = self.processed[vote.target]
+        # Enough votes have been received.
+        if (self.block_vote_count[vote.source][vote.target] > (self.network.total_deposit * 2) // 3):
+            
+            # Justify target
+            self.justified_checkpoints.add(vote.target)
 
-            # If the source was a direct parent of the target, the source
-            # is finalised
+            # Update highest justified checkpoint.
+            if vote.target_height > self.highest_justified_checkpoint.checkpoint_height:
+                self.highest_justified_checkpoint = self.received[vote.target]
+
+            # Finalise source if parent of target.
             if vote.source_height == vote.target_height - 1:
-                self.network.reward_node(id)
-                self.finalised.add(vote.source)
+                self.finalised_checkpoints.add(vote.source)
+
         return True
 
-    # Called on processing any object
-    def on_receive(self, obj):
-        if not BYZANTINE and  obj.hash in self.processed:
+    
+    def deliver(self, message):
+
+        # Ignore duplicates, or allow duplicate votes in Byzantine simulation.
+        if (not BYZANTINE and message.hash in self.received) or \
+            (BYZANTINE and isinstance(message, Block) and message.hash in self.received):
             return False
 
-        if isinstance(obj, Block):
-            o = self.accept_block(obj)
-        elif isinstance(obj, VoteMessage):
-            o = self.accept_vote(obj)
-        # If the object was successfully processed
-        # (ie. not flagged as having unsatisfied dependencies)
-        if o:
-            self.processed[obj.hash] = obj
-            if obj.hash in self.dependencies:
-                for d in self.dependencies[obj.hash]:
-                    self.on_receive(d)
-                del self.dependencies[obj.hash]
+        if isinstance(message, Block):
+            accepted = self.accept_block(message)
+        elif isinstance(message, VoteMessage):
+            accepted = self.check_vote(message)
+
+        if accepted:
+            
+            # Mark as processed.
+            self.received[message.hash] = message
+            
+            # Check message buffer.
+            if message.hash in self.message_buffer:
+                for d in self.message_buffer[message.hash]:
+                    self.deliver(d)
+                del self.message_buffer[message.hash]
