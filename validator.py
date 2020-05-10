@@ -1,4 +1,4 @@
-from block import Block, Dynasty
+from block import Block, BlockDynasty
 from message import VoteMessage
 from parameters import *
 
@@ -27,7 +27,7 @@ class Validator(object):
 
         # Set of finalised dynasties
         self.finalised_dynasties = set()
-        self.finalised_dynasties.add(Dynasty(INITIAL_VALIDATORS, 0))
+        self.finalised_dynasties.add(BlockDynasty(INITIAL_VALIDATORS, 0))
 
         # My current epoch
         self.current_height = 0
