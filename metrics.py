@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 
 from parameters import *
@@ -6,6 +7,10 @@ from block import Block
 from network import Network
 from votevalidator import VoteValidator
 from plot_graph import plot_node_blockchains
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 
 def fraction_justified_and_finalised(validator):
@@ -43,7 +48,7 @@ def main_chain_size(validator):
 def blocks_under_highest_justified(validator):
     """Computes the height of blocks below the checkpoint of highest height."""
     res = 0
-    for bhash, b in validator.processed.items():
+    for bhash, b in validator.received.items():
         if isinstance(b, Block):
             if b.height <= validator.highest_justified_checkpoint.height:
                 res += 1
@@ -54,7 +59,7 @@ def total_height_blocks(validator):
     """Total height of blocks processed by the validator.
     """
     res = 0
-    for bhash, b in validator.processed.items():
+    for bhash, b in validator.received.items():
         if isinstance(b, Block):
             res += 1
     return res
@@ -74,7 +79,7 @@ def count_forks(validator):
     # Stop when we reach the genesis block
     while block.height > 0:
         block_hash = block.prevhash
-        block = validator.processed[block_hash]
+        block = validator.received[block_hash]
         main_blocks.append(block_hash)
 
     # Check that we reached the genesis block
@@ -83,7 +88,7 @@ def count_forks(validator):
 
     # Now iterate through the blocks with height below highest_justified
     longest_fork = {}
-    for block_hash, block in validator.processed.items():
+    for block_hash, block in validator.received.items():
         if isinstance(block, Block):
             if block.height <= validator.highest_justified_checkpoint.height:
                 # Get the closest parent of block from the main blockchain
@@ -91,7 +96,7 @@ def count_forks(validator):
                 while block_hash not in main_blocks:
                     fork_length += 1
                     block_hash = block.prevhash
-                    block = validator.processed[block_hash]
+                    block = validator.received[block_hash]
                 assert block_hash in main_blocks
                 longest_fork[block_hash] = max(longest_fork.get(block_hash, 0), fork_length)
 
@@ -104,7 +109,10 @@ def count_forks(validator):
     return count_forks
 
 
-def print_metrics_latency(latencies, num_tries, validator_set=VALIDATOR_IDS):
+def print_metrics_latency(latencies, sample_size, validator_set=VALIDATOR_IDS):
+
+    results = {}
+
     for latency in latencies:
         jfsum = 0.0
         ffsum = 0.0
@@ -112,7 +120,7 @@ def print_metrics_latency(latencies, num_tries, validator_set=VALIDATOR_IDS):
         mcsum = 0.0
         busum = 0.0
         #fcsum = {}
-        for i in range(num_tries):
+        for i in range(sample_size):
             network = Network(latency)
             validators = [VoteValidator(network, i) for i in validator_set]
 
@@ -134,18 +142,43 @@ def print_metrics_latency(latencies, num_tries, validator_set=VALIDATOR_IDS):
                     #fcsum[l] = fcsum.get(l, 0) + fc[l]
 
         print('Latency: {}'.format(latency))
-        print('Justified: {}'.format(jfsum / len(validators) / num_tries))
-        print('finalised: {}'.format(ffsum / len(validators) / num_tries))
-        print('Justified in forks: {}'.format(jffsum / len(validators) / num_tries))
-        print('Main chain size: {}'.format(mcsum / len(validators) / num_tries))
-        print('Blocks under main justified: {}'.format(busum / len(validators) / num_tries))
+        print('Justified: {}'.format(jfsum / len(validators) / sample_size))
+        print('finalised: {}'.format(ffsum / len(validators) / sample_size))
+        print('Justified in forks: {}'.format(jffsum / len(validators) / sample_size))
+        print('Main chain size: {}'.format(mcsum / len(validators) / sample_size))
+        print('Blocks under main justified: {}'.format(busum / len(validators) / sample_size))
         print('Main chain fraction: {}'.format(
-            mcsum / (len(validators) * num_tries * (CHECKPOINT_DIFF * 50 + 1))))
+            mcsum / (len(validators) * sample_size * (CHECKPOINT_DIFF * 50 + 1))))
+
+        results[latency] = {}
+        results[latency]['justified'] = jfsum / len(validators) / sample_size
+        results[latency]['finalised'] = ffsum / len(validators) / sample_size
+        # results[latency]['Justified in forks'] = jffsum / len(validators) / sample_size
+        # results[latency]['Main chain size'] = mcsum / len(validators) / sample_size
+        # results[latency]['Blocks under main justified'] = busum / len(validators) / sample_size
+
+        results[latency]['Main chain fraction'] = mcsum / (len(validators) * sample_size * (CHECKPOINT_DIFF * 50 + 1))
+
         #for l in sorted(fcsum.keys()):
             #if l > 0:
                 #frac = float(fcsum[l]) / float(fcsum[0])
                 #print('Fraction of forks of size {}: {}'.format(l, frac))
         print('')
+
+    return results
+
+
+def plot_line_graphs(df, title, xlabel, ylabel, filename):
+    sns.set_style("darkgrid")
+    plot = sns.lineplot(data=df, size=15)
+
+    fig, ax = plt.subplots(figsize=(10,10))
+    sns.lineplot(ax=ax, data=df, markers=True)
+    plt.xlabel(xlabel, fontsize=15)
+    plt.ylabel(ylabel, fontsize=15)
+    plt.title(title, fontsize=25)
+    fig.savefig(f"{filename}.png")
+
 
 
 if __name__ == '__main__':
@@ -153,20 +186,56 @@ if __name__ == '__main__':
     if not os.path.exists(LOG_DIR):
         os.makedirs(LOG_DIR)
 
-    # Uncomment to have fractions of disconnected nodes
-    # fractions = np.arange(0.0, 0.4, 0.05)
-    # fractions = [0.31, 0.32, 0.33]
-    fractions = [0.0]
-    for fraction_disconnected in fractions:
-        num_validators = int((1.0 - fraction_disconnected) * NUM_VALIDATORS)
+
+
+    try:
+        print(sys.argv[1])
+        if sys.argv[1] != 'latency' and sys.argv[1] != 'network':
+            print("Wrong test configuration.")
+            sys.exit()
+
+    except:
+        print("Wrong test configuration.")
+        sys.exit()
+
+    test_type = sys.argv[1]
+    
+    sample_size = 10
+
+    print(f"Performing {test_type} simulation...")
+
+    if test_type == 'latency':
+        latencies = [1] + [i for i in range(2,42,2)]
+        num_validators = NUM_VALIDATORS
         validator_set = VALIDATOR_IDS[:num_validators]
+        results = print_metrics_latency(latencies, sample_size, validator_set)
 
-        print("Total height of nodes: {}".format(NUM_VALIDATORS))
-        print("height of connected of nodes: {}".format(len(validator_set)))
+    else:
+        
+        latencies = [10]
+        fractions = [0.05, 0.1, 0.2, 0.3, 0.33, 0.34, 0.4, 0.5]
+        results = {}
+        for fraction_disconnected in fractions:
 
-        # Uncomment to have different latencies
-        #latencies = [i for i in range(10, 300, 20)] + [500, 750, 1000]
-        latencies = [5,10,15]
-        num_tries = 5  # number of samples for each set of parameters
+            num_validators = int((1.0 - fraction_disconnected) * NUM_VALIDATORS)
+            validator_set = VALIDATOR_IDS[:num_validators]
+            print(f"Fraction disconnected {fraction_disconnected}")
+            results[fraction_disconnected] = print_metrics_latency(latencies, sample_size, validator_set)
 
-        print_metrics_latency(latencies, num_tries, validator_set)
+
+    if test_type == 'latency':
+        df = pd.DataFrame(results)
+        df = df.transpose()
+        plot_line_graphs(df, "Latency Impact on Casper", "Average Latency", "Percentage",  "LatencyImpact")
+
+    else:
+        dfs = []
+        print(results)
+        for i in results:
+            temp = pd.DataFrame(results[i])
+            temp = temp.transpose()
+            temp.index = [i]
+            dfs.append(temp)
+
+        results = pd.concat(dfs)
+        plot_line_graphs(results, "Partition Impact on Casper", "Network Partition", "Percentage", "PartitionImpact")

@@ -131,13 +131,15 @@ class VoteValidator(Validator):
             if self.is_ancestor(source_block, target_block):
                 
                 # ADD IN BYZANTINE BLOCKS
-                
+                                
                 vote = VoteMessage(source_block.hash,
                             target_block.hash,
                             source_block.checkpoint_height,
                             target_block.checkpoint_height,
                             self.id, self.deposit)
                 self.network.broadcast(vote)
+
+                #print(f"Validator {self.id} voting for block {target_block.hash}")
 
                 assert self.received[target_block.hash]
 
@@ -149,14 +151,12 @@ class VoteValidator(Validator):
 
                 # ADD IN SLASH
 
-                print('You just got slashed.')
                 return False
 
             if ((past_vote.source_height < new_vote.source_height and
                  past_vote.target_height > new_vote.target_height) or
                (past_vote.source_height > new_vote.source_height and
                  past_vote.target_height < new_vote.target_height)):
-                print('You just got slashed.')
                 return False
 
 
@@ -205,6 +205,7 @@ class VoteValidator(Validator):
         if (self.block_vote_count[vote.source][vote.target] > (self.network.total_deposit * 2) // 3):
             
             # Justify target
+            #print(f"Validator {self.id} justifying block {vote.target}")
             self.justified_checkpoints.add(vote.target)
 
             # Update highest justified checkpoint.
@@ -213,6 +214,7 @@ class VoteValidator(Validator):
 
             # Finalise source if parent of target.
             if vote.source_height == vote.target_height - 1:
+                #print(f"Validator {self.id} finalising block {vote.source}")
                 self.finalised_checkpoints.add(vote.source)
 
         return True

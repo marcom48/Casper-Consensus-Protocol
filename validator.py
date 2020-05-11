@@ -68,15 +68,16 @@ class Validator(object):
     def slash(self):
         
         if not self.slashed:
+            #print(f"Slashing validator {self.id}")
             x = self.deposit * 0.2
             self.deposit -= x
             self.slashed = True
-            print(f"{self.id}, {self.deposit}")
+            ##print(f"{self.id}, {self.deposit}")
             return x
         return 0
 
     def reward(self):
-        
+        #print(f"Rewarding validator {self.id}")
         x = self.deposit * 0.1
         self.deposit += x
         return x
@@ -93,5 +94,7 @@ class Validator(object):
             self.proposed_blocks.append(new_block)
 
             self.network.broadcast(new_block)
+            #print(f"Validator {self.id} proposing block{new_block.hash}")
+            
             
             self.deliver(new_block)

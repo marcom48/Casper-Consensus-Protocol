@@ -44,6 +44,11 @@ class Network(object):
 
 
         for node in self.validators:
+
+
+            # Do not broadcast block from self to self
+            # Handled atm in deliver, bc no duplicates
+            # Byzantine mode will deliver the block twice to itself
             
             # Create delay
             delay = self.generate_latency()
