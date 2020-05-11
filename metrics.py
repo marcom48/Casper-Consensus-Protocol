@@ -189,7 +189,7 @@ if __name__ == '__main__':
 
 
     try:
-        print(sys.argv[1])
+
         if sys.argv[1] != 'latency' and sys.argv[1] != 'network':
             print("Wrong test configuration.")
             sys.exit()
@@ -205,7 +205,8 @@ if __name__ == '__main__':
     print(f"Performing {test_type} simulation...")
 
     if test_type == 'latency':
-        latencies = [1] + [i for i in range(2,42,2)]
+        # latencies = [1] + [i for i in range(2,42,2)]
+        latencies = [5,10,15]
         num_validators = NUM_VALIDATORS
         validator_set = VALIDATOR_IDS[:num_validators]
         results = print_metrics_latency(latencies, sample_size, validator_set)

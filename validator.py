@@ -17,6 +17,7 @@ class Validator(object):
         self.message_buffer = {}
 
         self.proposed_blocks = []
+        self.proposed_votes = []
 
         # Current working height in tree.
         self.current_height = 0
@@ -30,6 +31,11 @@ class Validator(object):
 
         # Closest checkpoint ancestor for each block.
         self.path_membership = {ROOT.hash: ROOT.hash}
+
+
+        self.slashed = False
+
+        self.has_finalised = False
         
 
     # Add messages to a buffer for later processing.
@@ -67,18 +73,13 @@ class Validator(object):
 
     def slash(self):
         
-        if not self.slashed:
-            #print(f"Slashing validator {self.id}")
-            x = self.deposit * 0.2
-            self.deposit -= x
-            self.slashed = True
-            ##print(f"{self.id}, {self.deposit}")
-            return x
-        return 0
+        x = self.deposit * 0.01
+        self.deposit -= x
+        return x
 
     def reward(self):
         #print(f"Rewarding validator {self.id}")
-        x = self.deposit * 0.1
+        x = self.deposit * 0.01
         self.deposit += x
         return x
 
@@ -93,7 +94,7 @@ class Validator(object):
             new_block = Block(self.head)
             self.proposed_blocks.append(new_block)
 
-            self.network.broadcast(new_block)
+            self.network.broadcast(new_block, self.id)
             #print(f"Validator {self.id} proposing block{new_block.hash}")
             
             

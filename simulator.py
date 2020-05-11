@@ -30,3 +30,6 @@ if __name__ == '__main__':
         #     plot_node_blockchains(validators, filename)
     filename = os.path.join(LOG_DIR, "plot_{:03d}.png".format(t))
     plot_node_blockchains(validators, filename)
+
+    for i in validators:
+        print(i.deposit)

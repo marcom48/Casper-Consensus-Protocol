@@ -4,6 +4,8 @@ from network import VoteMessage
 from parameters import *
 from validator import ROOT, Validator
 import random
+from utils import generate_hash
+import math
 
 class VoteValidator(Validator):
 
@@ -19,7 +21,6 @@ class VoteValidator(Validator):
 
         self.main_chain_size = 1
 
-        self.proposed_votes = []
 
         # Justified checkpoints.
         self.justified_checkpoints = {ROOT.hash}
@@ -32,6 +33,7 @@ class VoteValidator(Validator):
 
         # Record of votes for blocks.
         self.block_vote_count = {}
+
 
     # Check if block is justified.
     def is_justified(self, _hash):
@@ -130,29 +132,43 @@ class VoteValidator(Validator):
 
             if self.is_ancestor(source_block, target_block):
                 
-                # ADD IN BYZANTINE BLOCKS
-                                
-                vote = VoteMessage(source_block.hash,
-                            target_block.hash,
-                            source_block.checkpoint_height,
-                            target_block.checkpoint_height,
-                            self.id, self.deposit)
-                self.network.broadcast(vote)
 
+                # if random.randint(0,50) > 40 and BYZANTINE and len(self.proposed_votes) > 0:
+                if self.id < math.ceil(NUM_VALIDATORS/4) and BYZANTINE and len(self.proposed_votes) > 0:
+
+                    n = len(self.proposed_votes)
+
+                    # Submit random previous vote to violate slashing condition 1.
+                    vote = self.proposed_votes[random.randint(0, n-1)]
+
+                    # Update hash so doesn't appear as duplicate.
+                    vote.hash = generate_hash()
+
+                                
+                else:
+                    vote = VoteMessage(source_block.hash,
+                                target_block.hash,
+                                source_block.checkpoint_height,
+                                target_block.checkpoint_height,
+                                self.id, self.deposit)
+
+                self.proposed_votes.append(vote)
                 #print(f"Validator {self.id} voting for block {target_block.hash}")
+                self.network.broadcast(vote, self.id)
+                self.deliver(vote)
+                
 
                 assert self.received[target_block.hash]
 
 
     def slashing_conditions(self, new_vote):
         for past_vote in self.validator_votes[new_vote.validator]:
+
+            # Slashing condition 1.
             if past_vote.target_height == new_vote.target_height:
-                # TODO: SLASH
-
-                # ADD IN SLASH
-
                 return False
 
+            # Slashing condition 2.
             if ((past_vote.source_height < new_vote.source_height and
                  past_vote.target_height > new_vote.target_height) or
                (past_vote.source_height > new_vote.source_height and
@@ -188,6 +204,7 @@ class VoteValidator(Validator):
 
         # Check the slashing conditions,
         if not self.slashing_conditions(vote):
+            self.network.slash_node(vote.validator)
             return False
 
         # Valid vote, add to record for validator.
@@ -215,6 +232,8 @@ class VoteValidator(Validator):
             # Finalise source if parent of target.
             if vote.source_height == vote.target_height - 1:
                 #print(f"Validator {self.id} finalising block {vote.source}")
+
+                self.network.reward_node(self.id)
                 self.finalised_checkpoints.add(vote.source)
 
         return True
@@ -222,9 +241,8 @@ class VoteValidator(Validator):
     
     def deliver(self, message):
 
-        # Ignore duplicates, or allow duplicate votes in Byzantine simulation.
-        if (not BYZANTINE and message.hash in self.received) or \
-            (BYZANTINE and isinstance(message, Block) and message.hash in self.received):
+        # Ignore duplicates.
+        if message.hash in self.received:
             return False
 
         if isinstance(message, Block):
