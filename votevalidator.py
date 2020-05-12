@@ -134,7 +134,7 @@ class VoteValidator(Validator):
                 
 
                 # if random.randint(0,50) > 40 and BYZANTINE and len(self.proposed_votes) > 0:
-                if self.id < math.ceil(NUM_VALIDATORS/4) and BYZANTINE and len(self.proposed_votes) > 0:
+                if self.id < math.ceil(NUM_VALIDATORS/FRAC_BYZ) and BYZANTINE and len(self.proposed_votes) > 0:
 
                     n = len(self.proposed_votes)
 

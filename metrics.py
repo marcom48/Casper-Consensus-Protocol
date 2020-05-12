@@ -109,7 +109,7 @@ def count_forks(validator):
     return count_forks
 
 
-def print_metrics_latency(latencies, sample_size, validator_set=VALIDATOR_IDS):
+def print_metrics_latency(latencies, SAMPLE_SIZE, validator_set=VALIDATOR_IDS):
 
     results = {}
 
@@ -120,7 +120,7 @@ def print_metrics_latency(latencies, sample_size, validator_set=VALIDATOR_IDS):
         mcsum = 0.0
         busum = 0.0
         #fcsum = {}
-        for i in range(sample_size):
+        for i in range(SAMPLE_SIZE):
             network = Network(latency)
             validators = [VoteValidator(network, i) for i in validator_set]
 
@@ -142,22 +142,22 @@ def print_metrics_latency(latencies, sample_size, validator_set=VALIDATOR_IDS):
                     #fcsum[l] = fcsum.get(l, 0) + fc[l]
 
         print('Latency: {}'.format(latency))
-        print('Justified: {}'.format(jfsum / len(validators) / sample_size))
-        print('finalised: {}'.format(ffsum / len(validators) / sample_size))
-        print('Justified in forks: {}'.format(jffsum / len(validators) / sample_size))
-        print('Main chain size: {}'.format(mcsum / len(validators) / sample_size))
-        print('Blocks under main justified: {}'.format(busum / len(validators) / sample_size))
+        print('Justified: {}'.format(jfsum / len(validators) / SAMPLE_SIZE))
+        print('finalised: {}'.format(ffsum / len(validators) / SAMPLE_SIZE))
+        print('Justified in forks: {}'.format(jffsum / len(validators) / SAMPLE_SIZE))
+        print('Main chain size: {}'.format(mcsum / len(validators) / SAMPLE_SIZE))
+        print('Blocks under main justified: {}'.format(busum / len(validators) / SAMPLE_SIZE))
         print('Main chain fraction: {}'.format(
-            mcsum / (len(validators) * sample_size * (CHECKPOINT_DIFF * 50 + 1))))
+            mcsum / (len(validators) * SAMPLE_SIZE * (CHECKPOINT_DIFF * 50 + 1))))
 
         results[latency] = {}
-        results[latency]['justified'] = jfsum / len(validators) / sample_size
-        results[latency]['finalised'] = ffsum / len(validators) / sample_size
-        # results[latency]['Justified in forks'] = jffsum / len(validators) / sample_size
-        # results[latency]['Main chain size'] = mcsum / len(validators) / sample_size
-        # results[latency]['Blocks under main justified'] = busum / len(validators) / sample_size
+        results[latency]['justified'] = jfsum / len(validators) / SAMPLE_SIZE
+        results[latency]['finalised'] = ffsum / len(validators) / SAMPLE_SIZE
+        # results[latency]['Justified in forks'] = jffsum / len(validators) / SAMPLE_SIZE
+        # results[latency]['Main chain size'] = mcsum / len(validators) / SAMPLE_SIZE
+        # results[latency]['Blocks under main justified'] = busum / len(validators) / SAMPLE_SIZE
 
-        results[latency]['Main chain fraction'] = mcsum / (len(validators) * sample_size * (CHECKPOINT_DIFF * 50 + 1))
+        results[latency]['Main chain fraction'] = mcsum / (len(validators) * SAMPLE_SIZE * (CHECKPOINT_DIFF * 50 + 1))
 
         #for l in sorted(fcsum.keys()):
             #if l > 0:
@@ -177,9 +177,73 @@ def plot_line_graphs(df, title, xlabel, ylabel, filename):
     plt.xlabel(xlabel, fontsize=15)
     plt.ylabel(ylabel, fontsize=15)
     plt.title(title, fontsize=25)
+    plt.ylim(0,1)
     fig.savefig(f"{filename}.png")
 
 
+
+def latency_test():
+    SAMPLE_SIZE = 10
+    latencies = [i for i in range(25)]
+    # latencies = [5,10,15,20]
+    num_validators = NUM_VALIDATORS
+    validator_set = VALIDATOR_IDS
+    results = print_metrics_latency(latencies, SAMPLE_SIZE, validator_set)
+
+    for i in latencies:
+        results[i]['Theoretical'] = 1 - (i/(i + BLOCK_PROPOSAL_TIME))
+
+    df = pd.DataFrame(results)
+    df = df.transpose()
+    plot_line_graphs(df, "Latency Impact on Casper", "Average Latency", "Percentage",  "LatencyImpact")
+
+
+def partition_test():
+    SAMPLE_SIZE = 10
+    latencies = [AVG_LATENCY]
+    fractions = [0.05, 0.1, 0.2, 0.3, 0.33, 0.34, 0.4]
+    results = {}
+    for frac in fractions:
+
+        num_validators = int((1.0 - frac) * NUM_VALIDATORS)
+        validator_set = VALIDATOR_IDS[:num_validators]
+        print(f"Fraction disconnected {frac}")
+        results[frac] = print_metrics_latency(latencies, SAMPLE_SIZE, validator_set)
+
+    dfs = []
+    for i in results:
+        temp = pd.DataFrame(results[i])
+        temp = temp.transpose()
+        temp.index = [i]
+        dfs.append(temp)
+
+    results = pd.concat(dfs)
+    plot_line_graphs(results, "Partition Impact on Casper", "Network Partition", "Percentage", "PartitionImpact")
+    
+def byzantine_test():
+    SAMPLE_SIZE = 10
+    latencies = [AVG_LATENCY]
+    fractions = [10,9,8,7,6,6,5,4,3,2]
+    results = {}
+    for frac in fractions:
+
+        num_validators = NUM_VALIDATORS
+        validator_set = VALIDATOR_IDS
+        FRAC_BYZ = frac
+
+        print(f"Fraction Byzantine 1/{frac}")
+        results[frac] = print_metrics_latency(latencies, SAMPLE_SIZE, validator_set)
+
+    dfs = []
+    for i in results:
+        temp = pd.DataFrame(results[i])
+        temp = temp.transpose()
+        temp.index = [i]
+        dfs.append(temp)
+
+    results = pd.concat(dfs)
+    plot_line_graphs(results, "Byzantine Impact on Casper", "Byzantine Fraction", "Percentage", "ByzantineImpact")
+    
 
 if __name__ == '__main__':
     LOG_DIR = 'metrics'
@@ -190,7 +254,7 @@ if __name__ == '__main__':
 
     try:
 
-        if sys.argv[1] != 'latency' and sys.argv[1] != 'network':
+        if sys.argv[1] not in ['latency', 'network', 'byzantine']:
             print("Wrong test configuration.")
             sys.exit()
 
@@ -200,43 +264,19 @@ if __name__ == '__main__':
 
     test_type = sys.argv[1]
     
-    sample_size = 10
+    SAMPLE_SIZE = 10
 
     print(f"Performing {test_type} simulation...")
 
     if test_type == 'latency':
         # latencies = [1] + [i for i in range(2,42,2)]
-        latencies = [5,10,15]
-        num_validators = NUM_VALIDATORS
-        validator_set = VALIDATOR_IDS[:num_validators]
-        results = print_metrics_latency(latencies, sample_size, validator_set)
+        latency_test()
 
-    else:
+    elif test_type == 'network':
         
-        latencies = [10]
-        fractions = [0.05, 0.1, 0.2, 0.3, 0.33, 0.34, 0.4, 0.5]
-        results = {}
-        for fraction_disconnected in fractions:
+        partition_test()
 
-            num_validators = int((1.0 - fraction_disconnected) * NUM_VALIDATORS)
-            validator_set = VALIDATOR_IDS[:num_validators]
-            print(f"Fraction disconnected {fraction_disconnected}")
-            results[fraction_disconnected] = print_metrics_latency(latencies, sample_size, validator_set)
-
-
-    if test_type == 'latency':
-        df = pd.DataFrame(results)
-        df = df.transpose()
-        plot_line_graphs(df, "Latency Impact on Casper", "Average Latency", "Percentage",  "LatencyImpact")
 
     else:
-        dfs = []
-        print(results)
-        for i in results:
-            temp = pd.DataFrame(results[i])
-            temp = temp.transpose()
-            temp.index = [i]
-            dfs.append(temp)
+        byzantine_test()
 
-        results = pd.concat(dfs)
-        plot_line_graphs(results, "Partition Impact on Casper", "Network Partition", "Percentage", "PartitionImpact")

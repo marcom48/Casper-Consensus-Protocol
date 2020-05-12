@@ -73,13 +73,13 @@ class Validator(object):
 
     def slash(self):
         
-        x = self.deposit * 0.01
+        x = self.deposit * SLASH
         self.deposit -= x
         return x
 
     def reward(self):
         #print(f"Rewarding validator {self.id}")
-        x = self.deposit * 0.01
+        x = self.deposit * REWARD
         self.deposit += x
         return x
 
