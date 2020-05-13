@@ -7,7 +7,6 @@ Austen McClernon 834063
 import math, os, sys
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
 import seaborn as sns
 from casper.block import Block
 from helper.parameters import *
