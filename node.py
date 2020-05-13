@@ -1,22 +1,33 @@
+'''
+COMP90020 Term Report
+Marco Marasco 834482
+Austen McClernon 834063
+'''
+
 from block import Block
 from network import VoteMessage
 from parameters import *
 from collections import defaultdict
 
-# Root of the blockchain
-ROOT = Block()
+# Create root.
+GENESIS = Block()
 
-class Validator(object):
-    """Abstract class for validators."""
+class Node(object):
+    '''
+    Class defining bare requirements for
+    a node in the blockchain network.
+    '''
 
     def __init__(self, network, _id):
 
         self.id = _id
-        self.received = {ROOT.hash: ROOT}
+        self.received = {GENESIS.hash: GENESIS}
+        # self.received = {}
 
         self.message_buffer = {}
 
         self.proposed_blocks = []
+        self.proposed_votes = []
 
         # Current working height in tree.
         self.current_height = 0
@@ -26,11 +37,18 @@ class Validator(object):
         self.network.register(self)
         
         # Path are for checkpoints, the value is last block before next checkpoint.
-        self.paths = {ROOT.hash: ROOT}
+        self.paths = {GENESIS.hash: GENESIS}
 
         # Closest checkpoint ancestor for each block.
-        self.path_membership = {ROOT.hash: ROOT.hash}
+        self.path_membership = {GENESIS.hash: GENESIS.hash}
+
+
+        self.slashed = False
+
+        self.has_finalised = False
         
+        self.byzantine = False
+
 
     # Add messages to a buffer for later processing.
     def add_message_buffer(self, hash_, obj):
@@ -67,33 +85,27 @@ class Validator(object):
 
     def slash(self):
         
-        if not self.slashed:
-            #print(f"Slashing validator {self.id}")
-            x = self.deposit * 0.2
-            self.deposit -= x
-            self.slashed = True
-            ##print(f"{self.id}, {self.deposit}")
-            return x
-        return 0
+        x = self.deposit * SLASH
+        self.deposit -= x
+        return x
 
     def reward(self):
         #print(f"Rewarding validator {self.id}")
-        x = self.deposit * 0.1
+        x = self.deposit * REWARD
         self.deposit += x
         return x
 
 
-    # Called every round
-    def tick(self, time):
+    def execute(self, time):
         
         # Generate block.
-        if self.id == (time // BLOCK_PROPOSAL_TIME) % NUM_VALIDATORS and time % BLOCK_PROPOSAL_TIME == 0:
+        if self.id == (time // BLOCK_FREQUENCY) % VALIDATORS and time % BLOCK_FREQUENCY == 0:
 
             # One node is authorized to create a new block and broadcast it
             new_block = Block(self.head)
             self.proposed_blocks.append(new_block)
 
-            self.network.broadcast(new_block)
+            self.network.broadcast(new_block, self.id)
             #print(f"Validator {self.id} proposing block{new_block.hash}")
             
             

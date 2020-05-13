@@ -1,0 +1,7 @@
+VALIDATORS = 10  # number of validators at each checkpoint
+list(range(VALIDATORS)) = list(range(0, VALIDATORS))  # set of validators
+BLOCK_FREQUENCY = 10  # adds a block every 100 executes
+CHECKPOINT_DIFF = 5  # checkpoint every 5 blocks
+AVG_LATENCY = 10  # will be modified in metrics
+INITIAL_DEPOSIT = 100
+BYZANTINE = True

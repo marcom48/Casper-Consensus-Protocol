@@ -1,8 +1,17 @@
-import utils
-from parameters import VALIDATOR_IDS, CHECKPOINT_DIFF
+'''
+COMP90020 Term Report
+Marco Marasco 834482
+Austen McClernon 834063
+'''
 
+import hash
+from parameters import *
 
 class Block():
+
+    '''
+    Block class for blockchain.
+    '''
 
     def __init__(self, parent=None):
 
@@ -17,10 +26,9 @@ class Block():
             self.height = parent.height + 1
             self.parent_hash = parent.hash
 
-        
-        self.validators = VALIDATOR_IDS
+        self.validators = list(range(VALIDATORS))
 
-        self.hash = utils.generate_hash()
+        self.hash = hash.generate_hash()
         
         self.is_checkpoint = self.height % CHECKPOINT_DIFF == 0
         
