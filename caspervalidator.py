@@ -1,32 +1,41 @@
+'''
+COMP90020 Term Report
+Marco Marasco 834482
+Austen McClernon 834063
+'''
 
 from block import Block
 from network import VoteMessage
 from parameters import *
-from validator import ROOT, Validator
+from node import GENESIS, Node
 import random
-from utils import generate_hash
+from hash import generate_hash
 import math
 
-class VoteValidator(Validator):
-
+class CasperValidator(Node):
+    '''
+    Class implements the Casper protocol
+    to justify and finalise blocks in a simulated
+    blockchain network.
+    '''
 
     def __init__(self, network, id):
-        super(VoteValidator, self).__init__(network, id)
+        super(CasperValidator, self).__init__(network, id)
 
-        self.head = ROOT
+        self.head = GENESIS
 
         self.deposit = INITIAL_DEPOSIT
 
-        self.highest_justified_checkpoint = ROOT
+        self.highest_justified_checkpoint = GENESIS
 
         self.main_chain_size = 1
 
 
         # Justified checkpoints.
-        self.justified_checkpoints = {ROOT.hash}
+        self.justified_checkpoints = {GENESIS.hash}
 
         # Finalised checkpoints
-        self.finalised_checkpoints = {ROOT.hash}
+        self.finalised_checkpoints = {GENESIS.hash}
 
         # Votes from all validators in network.
         self.validator_votes = {}
@@ -76,7 +85,8 @@ class VoteValidator(Validator):
             # Adjust end of tail.
             if block.height > self.paths[curr_tail].height:
                 self.paths[curr_tail] = block
-
+        
+        # Assert in correct tree.
         if self.is_ancestor(self.highest_justified_checkpoint, self.path_membership[block.hash]):
             
             # Update current working head.
@@ -133,8 +143,7 @@ class VoteValidator(Validator):
             if self.is_ancestor(source_block, target_block):
                 
 
-                # if random.randint(0,50) > 40 and BYZANTINE and len(self.proposed_votes) > 0:
-                if self.id < math.ceil(NUM_VALIDATORS/FRAC_BYZ) and BYZANTINE and len(self.proposed_votes) > 0:
+                if self.byzantine and len(self.proposed_votes) > 0:
 
                     n = len(self.proposed_votes)
 

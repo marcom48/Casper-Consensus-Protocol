@@ -1,11 +1,21 @@
+'''
+COMP90020 Term Report
+Marco Marasco 834482
+Austen McClernon 834063
+'''
+
 import random
 from parameters import *
-import utils
+import hash
 from block import Block
 from collections import defaultdict
 
 
 class Network(object):
+    '''
+    Network class to simulate the
+    blockchain environment.
+    '''
 
     def __init__(self, _latency):
 
@@ -17,8 +27,10 @@ class Network(object):
         self.to_reward = set()
         self.to_slash = set()
 
+        self.root = Block()
+
         # Total sum of deposits across validators.
-        self.total_deposit = INITIAL_DEPOSIT * NUM_VALIDATORS
+        self.total_deposit = INITIAL_DEPOSIT * VALIDATORS
 
     # Regist a validator with the network.
     def register(self, validators):
@@ -65,7 +77,7 @@ class Network(object):
 
             self.messages[deliver_time].append((node.id, msg))
 
-    def tick(self):
+    def execute(self):
 
         
 
@@ -82,7 +94,7 @@ class Network(object):
         # Continue time in validators.
         for node in self.validators:
 
-            node.tick(self.time)
+            node.execute(self.time)
 
 
 
@@ -111,7 +123,7 @@ class VoteMessage():
         self.validator = validator
         
         # Unique hash for vote.
-        self.hash = utils.generate_hash()
+        self.hash = hash.generate_hash()
         
         # Deposit from validator.
         self.deposit = deposit
