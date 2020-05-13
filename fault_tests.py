@@ -9,11 +9,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from block import Block
-from parameters import *
-from network import Network
-from caspervalidator import CasperValidator
-from visualisation import plot_node_blockchains
+from casper.block import Block
+from helper.parameters import *
+from casper.network import Network
+from casper.caspervalidator import CasperValidator
+from helper.visualisation import plot_node_blockchains
 
 
 def frac_just_fin(validator):
@@ -92,8 +92,9 @@ def run_tests(latencies, frac_byz, validator_set):
             validators = [CasperValidator(network, i) for i in validator_set]
 
             # Convert to Byzantine.
-            for j in range(math.ceil(VALIDATORS/frac_byz)):
-                validators[j].byzantine = True
+            if frac_byz != 0:
+                for j in range(math.ceil(VALIDATORS/frac_byz)):
+                    validators[j].byzantine = True
 
             # Run execution.
             for _ in range(BLOCK_FREQUENCY * CHECKPOINT_DIFF * CHECKPOINTS):
@@ -173,7 +174,7 @@ def latency_test():
     
     validator_set = list(range(VALIDATORS))
     
-    results = run_tests(latencies, SAMPLE_SIZE, 0, validator_set)
+    results = run_tests(latencies, 0, validator_set)
 
     # Add in theoretical results.
     for i in latencies:

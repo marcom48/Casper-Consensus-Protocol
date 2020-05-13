@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import pygraphviz  # used in the layout
 
-from block import Block
-from parameters import *
+from casper.block import Block
+from helper.parameters import *
 
 
 def create_blockchain(node):

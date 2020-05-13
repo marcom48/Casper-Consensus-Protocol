@@ -4,13 +4,12 @@ Marco Marasco 834482
 Austen McClernon 834063
 '''
 
-from block import Block
-from network import VoteMessage
-from parameters import *
-from node import GENESIS, Node
-import random
-from hash import generate_hash
-import math
+from casper.block import Block
+from casper.network import VoteMessage
+from helper.parameters import *
+from casper.node import GENESIS, Node
+from helper.hash_gen import generate_hash
+import math, random
 
 class CasperValidator(Node):
     '''

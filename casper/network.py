@@ -5,9 +5,9 @@ Austen McClernon 834063
 '''
 
 import random
-from parameters import *
-import hash
-from block import Block
+from helper.parameters import *
+from helper.hash_gen import generate_hash
+from casper.block import Block
 from collections import defaultdict
 
 
@@ -42,20 +42,11 @@ class Network(object):
 
     def slash_node(self, node):
         self.to_slash.add(node)
-        # for n in self.validators:
-        #     if n.id == node:
-        #         if not n.slashed:
-        #             self.total_deposit -= n.slash()
-        #         break
+
 
     
     def reward_node(self, node):
         self.to_reward.add(node)
-        # for n in self.validators:
-        #     if n.id == node:
-        #         self.total_deposit += n.reward()
-        #         break
-    
 
 
     def broadcast(self, msg, node_id):
@@ -66,10 +57,6 @@ class Network(object):
             if node == node_id:
                 continue
 
-            # Do not broadcast block from self to self
-            # Handled atm in deliver, bc no duplicates
-            # Byzantine mode will deliver the block twice to itself
-            
             # Create delay
             delay = self.generate_latency()
 
@@ -78,8 +65,6 @@ class Network(object):
             self.messages[deliver_time].append((node.id, msg))
 
     def execute(self):
-
-        
 
         # Check for messages to be sent
         if self.time in self.messages:
@@ -123,7 +108,7 @@ class VoteMessage():
         self.validator = validator
         
         # Unique hash for vote.
-        self.hash = hash.generate_hash()
+        self.hash = generate_hash()
         
         # Deposit from validator.
         self.deposit = deposit

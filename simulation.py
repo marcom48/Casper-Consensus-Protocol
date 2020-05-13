@@ -5,10 +5,10 @@ Austen McClernon 834063
 '''
 
 import os, math
-from network import Network
-from caspervalidator import CasperValidator
-from visualisation import plot_node_blockchains
-from parameters import *
+from casper.network import Network
+from casper.caspervalidator import CasperValidator
+from helper.visualisation import plot_node_blockchains
+from helper.parameters import *
 
 
 

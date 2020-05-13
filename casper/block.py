@@ -4,8 +4,8 @@ Marco Marasco 834482
 Austen McClernon 834063
 '''
 
-import hash
-from parameters import *
+from  helper.hash_gen import generate_hash
+from helper.parameters import *
 
 class Block():
 
@@ -28,7 +28,7 @@ class Block():
 
         self.validators = list(range(VALIDATORS))
 
-        self.hash = hash.generate_hash()
+        self.hash = generate_hash()
         
         self.is_checkpoint = self.height % CHECKPOINT_DIFF == 0
         

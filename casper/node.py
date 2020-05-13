@@ -4,9 +4,9 @@ Marco Marasco 834482
 Austen McClernon 834063
 '''
 
-from block import Block
-from network import VoteMessage
-from parameters import *
+from casper.block import Block
+from casper.network import VoteMessage
+from helper.parameters import *
 from collections import defaultdict
 
 # Create root.
