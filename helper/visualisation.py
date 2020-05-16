@@ -3,13 +3,15 @@ COMP90020 Term Report
 Marco Marasco 834482
 Austen McClernon 834063
 
-Helper functions to draw blockchains.
+Helper functions to draw blockchains and graphs.
 '''
 
-import random
+import random, os
 import matplotlib.pyplot as plt
 import networkx as nx
-import pygraphviz  # used in the layout
+import pygraphviz
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from casper.block import Block
 from helper.parameters import *
@@ -87,3 +89,20 @@ def plot_node_blockchains(validators, image_file):
 
     plt.savefig(image_file)
     plt.close()
+
+
+def plot_line_graphs(df, title, xlabel, ylabel, filename):
+    '''
+    Function plots results of tests.
+    '''
+    sns.set_style("darkgrid")
+    plot = sns.lineplot(data=df, size=15)
+
+    fig, ax = plt.subplots(figsize=(10,10))
+    sns.lineplot(ax=ax, data=df, markers=True)
+    plt.xlabel(xlabel, fontsize=15)
+    plt.ylabel(ylabel, fontsize=15)
+    plt.title(title, fontsize=25)
+    plt.ylim(0,1)
+    filename = os.path.join(FAULT_FOLDER, f"{filename}.png")   
+    fig.savefig(filename)

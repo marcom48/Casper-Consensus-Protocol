@@ -6,13 +6,11 @@ Austen McClernon 834063
 
 import math, os, sys
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 from casper.block import Block
 from helper.parameters import *
 from casper.network import Network
 from casper.caspervalidator import CasperValidator
-from helper.visualisation import plot_node_blockchains
+from helper.visualisation import plot_node_blockchains, plot_line_graphs
 
 
 def frac_just_fin(validator):
@@ -119,37 +117,25 @@ def run_tests(latencies, frac_byz, validator_set):
         print(f'Average number justified: {average_justified}')
         print(f'Average number finalised: {average_finalised}')
         print(f'Average main chain size: {average_mainchain}')
-        print(f'Average fraction of blocks in main chain: {average_frac_of_main}')
+        print(f'Average % of blocks in main chain: {average_frac_of_main}')
+        print()
 
         # Add results to dictionary.
         results[latency] = {}
-        results[latency]['justified'] = average_justified
-        results[latency]['finalised'] = average_finalised
-        results[latency]['Main chain fraction'] = average_frac_of_main
+        results[latency]['Justified Blocks'] = average_justified
+        results[latency]['Finalised Blocks'] = average_finalised
+        results[latency]['Main Chain'] = average_frac_of_main
         
-        print()
 
     return results
 
 
-def plot_line_graphs(df, title, xlabel, ylabel, filename):
-    '''
-    Function plots results of tests.
-    '''
-    sns.set_style("darkgrid")
-    plot = sns.lineplot(data=df, size=15)
-
-    fig, ax = plt.subplots(figsize=(10,10))
-    sns.lineplot(ax=ax, data=df, markers=True)
-    plt.xlabel(xlabel, fontsize=15)
-    plt.ylabel(ylabel, fontsize=15)
-    plt.title(title, fontsize=25)
-    plt.ylim(0,1)
-    filename = os.path.join(FAULT_FOLDER, f"{filename}.png")   
-    fig.savefig(filename)
-
-
 def collate_results(results):
+    '''
+    Function collates results from tests into
+    a Pandas dataframe for later plotting.
+    '''
+
     dfs = []
     for i in results:
         temp = pd.DataFrame(results[i])
@@ -167,16 +153,15 @@ def latency_test():
     network latency values.
     '''
         
-    latencies = [i for i in range(25)]
     
     num_validators = VALIDATORS
     
     validator_set = list(range(VALIDATORS))
     
-    results = run_tests(latencies, 0, validator_set)
+    results = run_tests(LATENCIES, 0, validator_set)
 
     # Add in theoretical results.
-    for i in latencies:
+    for i in LATENCIES:
         results[i]['Theoretical'] = 1 - (i/(i + BLOCK_FREQUENCY))
 
     df = pd.DataFrame(results)
@@ -193,9 +178,8 @@ def partition_test():
     '''
 
     latencies = [AVG_LATENCY]
-    fractions = [0.05, 0.1, 0.2, 0.3, 0.33, 0.34, 0.4]
     results = {}
-    for frac in fractions:
+    for frac in PARTITIONS:
 
         print(f"Fraction disconnected {frac}")
         
@@ -217,15 +201,13 @@ def byzantine_test():
 
     SAMPLE_SIZE = 10
     latencies = [AVG_LATENCY]
-    fractions = [10,9,8,7,6,6,5,4,3,2]
-
+    
     results = {}
     
-    for frac in fractions:
+    for frac in BYZANTINES:
 
         num_validators = VALIDATORS
         validator_set = list(range(VALIDATORS))
-        FRAC_BYZ = frac
 
         print(f"Fraction Byzantine 1/{frac}")
         results[frac] = run_tests(latencies, frac, validator_set)
@@ -236,7 +218,9 @@ def byzantine_test():
 
 
 def main():
-
+    '''
+    Control function for method testing.
+    '''
     try:
 
         if sys.argv[1] not in ['latency', 'network', 'byzantine']:
@@ -252,8 +236,8 @@ def main():
         os.makedirs(FAULT_FOLDER)
 
     test_type = sys.argv[1]
-    print(f"Performing {test_type} simulation...")
 
+    print(f"Performing {test_type} simulation...")
     if test_type == 'latency':
 
         latency_test()
@@ -263,8 +247,8 @@ def main():
         partition_test()
     
     else:
-        byzantine_test()
 
+        byzantine_test()
 
 
 if __name__ == '__main__':
