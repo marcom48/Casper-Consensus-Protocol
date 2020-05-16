@@ -32,7 +32,7 @@ class Network(object):
         # Total sum of deposits across validators.
         self.total_deposit = INITIAL_DEPOSIT * VALIDATORS
 
-    # Regist a validator with the network.
+
     def register(self, validators):
         self.validators.append(validators)
 
@@ -43,14 +43,16 @@ class Network(object):
     def slash_node(self, node):
         self.to_slash.add(node)
 
-
-    
+   
     def reward_node(self, node):
         self.to_reward.add(node)
 
 
-    def broadcast(self, msg, node_id):
-
+    def broadcast(self, msg, node_id):       
+        '''
+        Function broadcasts a message to validators
+        in the network with varying latencies.
+        '''
 
         for node in self.validators:
             
@@ -65,6 +67,10 @@ class Network(object):
             self.messages[deliver_time].append((node.id, msg))
 
     def execute(self):
+        '''
+        Function simulates the passage of
+        a unit of time throughout the network.
+        '''
 
         # Check for messages to be sent
         if self.time in self.messages:
@@ -76,28 +82,28 @@ class Network(object):
             # Remove messages
             del self.messages[self.time]
 
-        # Continue time in validators.
         for node in self.validators:
 
             node.execute(self.time)
 
 
-
-        # Reward and slash nodes here
+        # Reward and slash nodes.
         for node in list(self.to_reward):
             self.total_deposit += self.validators[node].reward()
+        
         for node in list(self.to_slash):
             self.total_deposit -= self.validators[node].slash()
 
         self.to_reward.clear()
         self.to_slash.clear()
 
-
         self.time += 1
 
 
 class VoteMessage():
-
+    '''
+    Class contains structure for votes through network.
+    '''
     def __init__(self, source, target, source_height, target_height, validator, deposit):
         self.source = source
         self.target = target

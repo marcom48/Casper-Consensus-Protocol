@@ -53,6 +53,10 @@ class CasperValidator(Node):
 
 
     def accept_block(self, block):
+        '''
+        Function processes a received block and determines whether to vote to add
+        it to the chain or not.
+        '''
 
         # Haven't recieved block's parent.
         if block.parent_hash not in self.received:
@@ -68,7 +72,7 @@ class CasperValidator(Node):
             self.path_membership[block.hash] = block.hash
             self.paths[block.hash] = block
 
-            # Maybe vote
+            # Create vote
             self.create_vote(block)
 
         else:
@@ -98,9 +102,11 @@ class CasperValidator(Node):
             self.fix_head(block)
 
         return True
-
-    # Adjust current head to highest checkpointed head 
+ 
     def fix_head(self, block):
+        '''
+        Adjust current working chain head to highest checkpointed block.
+        '''
 
         max_height = self.highest_justified_checkpoint.height
         max_descendant = self.highest_justified_checkpoint.hash
@@ -122,9 +128,11 @@ class CasperValidator(Node):
 
 
     def create_vote(self, block):
+        '''
+        Function creates and submits a vote for a block to the
+        validators in the network.
+        '''
 
-        # assert block.height % CHECKPOINT_DIFF == 0, (
-        #     "Block {} is not a checkpoint.".format(block.hash))
 
         # Create blocks for supermajority link vote.
         target_block = block
@@ -133,8 +141,6 @@ class CasperValidator(Node):
         # Assert creating a block for a new height.
         if target_block.checkpoint_height > self.current_height:
 
-            # assert target_block.checkpoint_height > source_block.checkpoint_height, ("target epoch: {},"
-            # "source epoch: {}".format(target_block.checkpoint_height, source_block.checkpoint_height))
 
             # Adjust current working height.
             self.current_height = target_block.checkpoint_height
@@ -149,9 +155,8 @@ class CasperValidator(Node):
                     # Submit random previous vote to violate slashing condition 1.
                     vote = self.proposed_votes[random.randint(0, n-1)]
 
-                    # Update hash so doesn't appear as duplicate.
+                    # Update hash so doesn't appear as duplicate message.
                     vote.hash = generate_hash()
-
                                 
                 else:
                     vote = VoteMessage(source_block.hash,
@@ -161,15 +166,16 @@ class CasperValidator(Node):
                                 self.id, self.deposit)
 
                 self.proposed_votes.append(vote)
-                #print(f"Validator {self.id} voting for block {target_block.hash}")
                 self.network.broadcast(vote, self.id)
                 self.deliver(vote)
                 
 
-                assert self.received[target_block.hash]
-
 
     def slashing_conditions(self, new_vote):
+        '''
+        Function determines if a validators has violated the 
+        Casper slashing conditions.
+        '''
         for past_vote in self.validator_votes[new_vote.validator]:
 
             # Slashing condition 1.
@@ -183,10 +189,14 @@ class CasperValidator(Node):
                  past_vote.target_height < new_vote.target_height)):
                 return False
 
-
         return True
 
     def check_vote(self, vote):
+        '''
+        Function asserts whether a received vote is a valid vote.
+        If enough votes have been received for the relevant block,
+        the block is justified.
+        '''
 
 
        # Haven't received source block yet.
@@ -230,7 +240,6 @@ class CasperValidator(Node):
         if (self.block_vote_count[vote.source][vote.target] > (self.network.total_deposit * 2) // 3):
             
             # Justify target
-            #print(f"Validator {self.id} justifying block {vote.target}")
             self.justified_checkpoints.add(vote.target)
 
             # Update highest justified checkpoint.
@@ -239,8 +248,6 @@ class CasperValidator(Node):
 
             # Finalise source if parent of target.
             if vote.source_height == vote.target_height - 1:
-                #print(f"Validator {self.id} finalising block {vote.source}")
-
                 self.network.reward_node(self.id)
                 self.finalised_checkpoints.add(vote.source)
 
@@ -248,6 +255,10 @@ class CasperValidator(Node):
 
     
     def deliver(self, message):
+        '''
+        Function delivers a message from the network to 
+        the validator.
+        '''
 
         # Ignore duplicates.
         if message.hash in self.received:

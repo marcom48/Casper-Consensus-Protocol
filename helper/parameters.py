@@ -4,7 +4,7 @@ Marco Marasco 834482
 Austen McClernon 834063
 '''
 
-########## Execution Parameters ##########
+########## Casper Parameters ##########
 
 VALIDATORS = 5
 
@@ -24,7 +24,7 @@ AVG_LATENCY = 10
 INITIAL_DEPOSIT = 100
 
 # Percentage values to slash/reward validators.
-SLASH = 0.01
+SLASH = 0.00
 REWARD = 0.05
 
 
@@ -48,7 +48,7 @@ FAULT_FOLDER = 'fault_graphs'
 # Sample size for fault testing.
 SAMPLE_SIZE = 10
 
-# Latencies for latency test.
+# Latency values for latency test.
 LATENCIES = [i for i in range(25)]
 
 # Network partition sizes for partition test.

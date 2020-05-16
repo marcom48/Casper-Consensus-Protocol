@@ -42,7 +42,6 @@ class Node(object):
         # Closest checkpoint ancestor for each block.
         self.path_membership = {GENESIS.hash: GENESIS.hash}
 
-
         self.slashed = False
 
         self.has_finalised = False
@@ -50,14 +49,15 @@ class Node(object):
         self.byzantine = False
 
 
-    # Add messages to a buffer for later processing.
     def add_message_buffer(self, hash_, obj):
+        '''
+        Add messages to a buffer for later processing.
+        '''
         if hash_ not in self.message_buffer:
             self.message_buffer[hash_] = []
         self.message_buffer[hash_].append(obj)
 
 
-    # Get the checkpoint immediately before a given checkpoint
     def get_checkpoint_parent(self, block):
 
         # Genesis
@@ -85,28 +85,28 @@ class Node(object):
 
     def slash(self):
         
-        x = self.deposit * SLASH
-        self.deposit -= x
-        return x
+        slash_amount = self.deposit * SLASH
+        self.deposit -= slash_amount
+        return slash_amount
 
     def reward(self):
-        #print(f"Rewarding validator {self.id}")
-        x = self.deposit * REWARD
-        self.deposit += x
-        return x
+        reward_amount = self.deposit * REWARD
+        self.deposit += reward_amount
+        return reward_amount
 
 
     def execute(self, time):
-        
-        # Generate block.
+        '''
+        Function simulates a unit of time passing in the validator.
+        '''
+
+        # Generate block for round robin.
         if self.id == (time // BLOCK_FREQUENCY) % VALIDATORS and time % BLOCK_FREQUENCY == 0:
 
-            # One node is authorized to create a new block and broadcast it
             new_block = Block(self.head)
+
             self.proposed_blocks.append(new_block)
 
             self.network.broadcast(new_block, self.id)
-            #print(f"Validator {self.id} proposing block{new_block.hash}")
-            
             
             self.deliver(new_block)
