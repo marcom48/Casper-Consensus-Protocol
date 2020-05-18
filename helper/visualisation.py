@@ -3,7 +3,7 @@ COMP90020 Term Report
 Marco Marasco 834482
 Austen McClernon 834063
 
-Helper functions to draw blockchains and graphs.
+Helper functions to plot blockchains and graphs.
 '''
 
 import random, os
@@ -67,8 +67,10 @@ def plot_node_blockchains(validators, image_file):
 
             if validator.is_finalised(block_hash):
                 color = '#00B300'
-            else:
+            elif validator.is_justified(block_hash):
                 color = '#FFA500'
+            else:
+                color = 'r'
             colour_list.append(color)
 
             # Randomly distribute children across their height.
@@ -83,7 +85,7 @@ def plot_node_blockchains(validators, image_file):
         pos = nx.drawing.nx_agraph.pygraphviz_layout(blockchain, prog='dot')
         
         # Draw.
-        nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, labels=labels, width = 1, style='dashed', node_shape='s')
+        nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, width = 1, style='dashed', node_shape='s')
 
         count += 1
 
