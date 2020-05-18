@@ -223,7 +223,7 @@ def main():
     '''
     try:
 
-        if sys.argv[1] not in ['latency', 'network', 'byzantine']:
+        if sys.argv[1] not in ['latency', 'network', 'byzantine', 'all']:
             print("Wrong test configuration.")
             sys.exit()
 
@@ -246,8 +246,14 @@ def main():
         
         partition_test()
     
+    elif test_type == 'byzantine':
+
+        byzantine_test()
+        
     else:
 
+        latency_test()
+        partition_test()
         byzantine_test()
 
 
