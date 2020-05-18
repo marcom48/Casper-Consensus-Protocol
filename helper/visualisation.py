@@ -85,6 +85,7 @@ def plot_node_blockchains(validators, image_file):
         pos = nx.drawing.nx_agraph.pygraphviz_layout(blockchain, prog='dot')
         
         # Draw.
+        blockchain = nx.DiGraph.reverse(blockchain)
         nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, width = 1, style='dashed', node_shape='s')
 
         count += 1
