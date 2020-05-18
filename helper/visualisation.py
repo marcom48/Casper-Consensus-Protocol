@@ -17,7 +17,7 @@ from casper.block import Block
 from helper.parameters import *
 
 
-def create_blockchain(node):
+def create_blockchain(node, labels):
 
     blockchain = nx.DiGraph()
 
@@ -33,6 +33,11 @@ def create_blockchain(node):
 
                 blockchain.add_node(block_hash)
 
+                # Create one-to-one mapping of hash to label
+                if block_hash not in labels:
+                    count = len(labels)
+                    labels[block_hash] = count
+
                 # Assert not genesis
                 if block.height > 0:
 
@@ -47,9 +52,12 @@ def create_blockchain(node):
 
 def plot_node_blockchains(validators, image_file):
 
+
+    labels = {}
+
     num_validators = len(validators)
 
-    blockchains = [create_blockchain(i) for i in validators]
+    blockchains = [create_blockchain(i, labels) for i in validators]
 
     # Set figure size.
     plt.figure(figsize=(40, 20))
@@ -61,7 +69,6 @@ def plot_node_blockchains(validators, image_file):
         colour_list = []
 
         pos = {}
-        labels = {}
         for block_hash in list(blockchain.nodes()):
             block = validator.received[block_hash]
 
@@ -78,7 +85,7 @@ def plot_node_blockchains(validators, image_file):
 
         # Create subplot
         ax = plt.subplot(1, len(blockchains), count + 1)
-        ax.set_title(f"Validator {validator.id}", fontsize=30)
+        ax.set_title(f"Validator {validator.id + 1}", fontsize=30)
 
 
         # Create graph.
@@ -86,7 +93,7 @@ def plot_node_blockchains(validators, image_file):
         
         # Draw.
         blockchain = nx.DiGraph.reverse(blockchain)
-        nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, width = 1, style='dashed', node_shape='s')
+        nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, labels=labels, width = 1, style='dashed', node_shape='s')
 
         count += 1
 
