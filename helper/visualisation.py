@@ -55,6 +55,8 @@ def plot_node_blockchains(validators, image_file):
     plt.figure(figsize=(40, 20))
 
     count = 0
+
+    labels = {}
     for validator, blockchain in zip(validators, blockchains):
  
         # Create list of committable validators
@@ -66,7 +68,10 @@ def plot_node_blockchains(validators, image_file):
 
             block = validator.received[block_hash]
 
-            label_set.add(block_hash)
+            # label_set.add(block_hash)
+            # if block_hash not in labels:
+            #     x = len(labels)
+            #     labels[block_hash] = x
 
             if block_hash not in validator.received:
                 print("HERE")
@@ -79,7 +84,7 @@ def plot_node_blockchains(validators, image_file):
                 color = 'r'
             colour_list.append(color)
 
-        labels = {j:i for i,j in enumerate(list(label_set))}
+        # labels = {j:i for i,j in enumerate(list(label_set))}
 
         # Create subplot
         ax = plt.subplot(1, len(blockchains), count + 1)
@@ -90,7 +95,8 @@ def plot_node_blockchains(validators, image_file):
         
         # Draw.
         blockchain = nx.DiGraph.reverse(blockchain)
-        nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, labels=labels, width = 1, style='dashed', node_shape='s')
+        # nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, labels=labels, width = 1, style='dashed', node_shape='s')
+        nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, width = 1, style='dashed', node_shape='s')
 
         count += 1
 
