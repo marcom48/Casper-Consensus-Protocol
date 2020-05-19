@@ -47,6 +47,7 @@ def create_blockchain(node, labels):
                     # Add edge from parent.
                     blockchain.add_edge(block_hash, prev_checkpoint_hash)
 
+    # return blockchain, labels
     return blockchain
 
 
@@ -56,7 +57,11 @@ def plot_node_blockchains(validators, image_file):
     labels = {}
 
     num_validators = len(validators)
-
+    # blockchains = []
+    # for i in validators:
+    #     b, x = create_blockchain(i, labels)
+    #     blockchains.append(b)
+    #     labels.update(x)
     blockchains = [create_blockchain(i, labels) for i in validators]
 
     # Set figure size.
@@ -93,7 +98,8 @@ def plot_node_blockchains(validators, image_file):
         
         # Draw.
         blockchain = nx.DiGraph.reverse(blockchain)
-        nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, labels=labels, width = 1, style='dashed', node_shape='s')
+        # nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, labels=labels, width = 1, style='dashed', node_shape='s')
+        nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, width = 1, style='dashed', node_shape='s')
 
         count += 1
 
