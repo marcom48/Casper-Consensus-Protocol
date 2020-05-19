@@ -17,7 +17,7 @@ from casper.block import Block
 from helper.parameters import *
 
 
-def create_blockchain(node, labels):
+def create_blockchain(node):
 
     blockchain = nx.DiGraph()
 
@@ -33,11 +33,6 @@ def create_blockchain(node, labels):
 
                 blockchain.add_node(block_hash)
 
-                # Create one-to-one mapping of hash to label
-                if block_hash not in labels:
-                    count = len(labels)
-                    labels[block_hash] = count
-
                 # Assert not genesis
                 if block.height > 0:
 
@@ -47,22 +42,14 @@ def create_blockchain(node, labels):
                     # Add edge from parent.
                     blockchain.add_edge(block_hash, prev_checkpoint_hash)
 
-    # return blockchain, labels
+
     return blockchain
 
 
 def plot_node_blockchains(validators, image_file):
 
-
-    labels = {}
-
-    num_validators = len(validators)
-    # blockchains = []
-    # for i in validators:
-    #     b, x = create_blockchain(i, labels)
-    #     blockchains.append(b)
-    #     labels.update(x)
-    blockchains = [create_blockchain(i, labels) for i in validators]
+    # Gather blockchains from validators.
+    blockchains = [create_blockchain(i) for i in validators]
 
     # Set figure size.
     plt.figure(figsize=(40, 20))
@@ -74,8 +61,15 @@ def plot_node_blockchains(validators, image_file):
         colour_list = []
 
         pos = {}
+        label_set = set()
         for block_hash in list(blockchain.nodes()):
+
             block = validator.received[block_hash]
+
+            label_set.add(block_hash)
+
+            if block_hash not in validator.received:
+                print("HERE")
 
             if validator.is_finalised(block_hash):
                 color = '#00B300'
@@ -85,21 +79,18 @@ def plot_node_blockchains(validators, image_file):
                 color = 'r'
             colour_list.append(color)
 
-            # Randomly distribute children across their height.
-            pos[block_hash] = (random.gauss(0, 1), block.checkpoint_height)
+        labels = {j:i for i,j in enumerate(list(label_set))}
 
         # Create subplot
         ax = plt.subplot(1, len(blockchains), count + 1)
         ax.set_title(f"Validator {validator.id + 1}", fontsize=30)
-
 
         # Create graph.
         pos = nx.drawing.nx_agraph.pygraphviz_layout(blockchain, prog='dot')
         
         # Draw.
         blockchain = nx.DiGraph.reverse(blockchain)
-        # nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, labels=labels, width = 1, style='dashed', node_shape='s')
-        nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, width = 1, style='dashed', node_shape='s')
+        nx.draw(blockchain, arrows=True, pos=pos, node_color=colour_list, labels=labels, width = 1, style='dashed', node_shape='s')
 
         count += 1
 
