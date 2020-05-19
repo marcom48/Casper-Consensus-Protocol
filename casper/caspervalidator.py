@@ -236,6 +236,9 @@ class CasperValidator(Node):
         self.block_vote_count[vote.source][vote.target] = self.block_vote_count[
             vote.source].get(vote.target, 0) + vote.deposit
 
+        # Reward node for correct vote.
+        self.network.reward_node(vote.validator)
+
         # Enough votes have been received.
         if (self.block_vote_count[vote.source][vote.target] > (self.network.total_deposit * 2) // 3):
             
@@ -248,7 +251,7 @@ class CasperValidator(Node):
 
             # Finalise source if parent of target.
             if vote.source_height == vote.target_height - 1:
-                self.network.reward_node(self.id)
+
                 self.finalised_checkpoints.add(vote.source)
 
         return True
