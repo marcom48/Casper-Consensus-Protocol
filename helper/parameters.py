@@ -24,7 +24,7 @@ AVG_LATENCY = 10
 INITIAL_DEPOSIT = 100
 
 # Percentage values to slash/reward validators.
-SLASH = 0.00
+SLASH = 0.01
 REWARD = 0.05
 
 
