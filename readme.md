@@ -1,5 +1,7 @@
 # Casper Consensus Protocol
 
+By [Marco Marasco](https://github.com/marcom48/) & [Austen McClernon](https://github.com/kvoli/)
+
 This repository contains an application that simulates a blockchain environment that implements the Casper Finality consensus protocol for determining finality of blocks generated in the blockchain.
 
 Below are high-level descriptions of each of the files. Each file contains further commenting and explanations of its logic.
