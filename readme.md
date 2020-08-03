@@ -1,8 +1,11 @@
 # Casper Consensus Protocol
 
-This application simulates a blockchain environment that implements the Casper Finality consensus protocol for determining finality of blocks generated in the blockchain.
+This repository contains an application that simulates a blockchain environment that implements the Casper Finality consensus protocol for determining finality of blocks generated in the blockchain.
 
 Below are high-level descriptions of each of the files. Each file contains further commenting and explanations of its logic.
+
+**Report.pdf**
+This paper outlines the foundation of the consensus problem within distributed systems, providing a taxonomy of protocols for various types blockchains that address this problem, as well as a case study on Ethereum’s novel PoS consensus model Casper.
 
 **simulation.py**
 File is used to simulate and visualise a blockchain that implements the Casper protocol.
